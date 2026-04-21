@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -155,12 +154,7 @@ func (s *Whatsmiau) SendAudio(ctx context.Context, data *SendAudioRequest) (*Sen
 		return nil, fmt.Errorf("remote_jid is required")
 	}
 
-	resAudio, err := s.getCtx(ctx, data.AudioURL)
-	if err != nil {
-		return nil, err
-	}
-
-	dataBytes, err := io.ReadAll(resAudio.Body)
+	dataBytes, err := s.fetchBytes(ctx, data.AudioURL)
 	if err != nil {
 		return nil, err
 	}
@@ -228,12 +222,7 @@ func (s *Whatsmiau) SendDocument(ctx context.Context, data *SendDocumentRequest)
 		return nil, fmt.Errorf("remote_jid is required")
 	}
 
-	resMedia, err := s.getCtx(ctx, data.MediaURL)
-	if err != nil {
-		return nil, err
-	}
-
-	dataBytes, err := io.ReadAll(resMedia.Body)
+	dataBytes, err := s.fetchBytes(ctx, data.MediaURL)
 	if err != nil {
 		return nil, err
 	}
@@ -293,12 +282,7 @@ func (s *Whatsmiau) SendImage(ctx context.Context, data *SendImageRequest) (*Sen
 		return nil, fmt.Errorf("remote_jid is required")
 	}
 
-	resMedia, err := s.getCtx(ctx, data.MediaURL)
-	if err != nil {
-		return nil, err
-	}
-
-	dataBytes, err := io.ReadAll(resMedia.Body)
+	dataBytes, err := s.fetchBytes(ctx, data.MediaURL)
 	if err != nil {
 		return nil, err
 	}
