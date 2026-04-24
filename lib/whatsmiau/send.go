@@ -21,6 +21,8 @@ type SendText struct {
 	RemoteJID      *types.JID `json:"remote_jid"`
 	QuoteMessageID string     `json:"quote_message_id"`
 	QuoteMessage   string     `json:"quote_message"`
+	QuoteRemoteJid string     `json:"quote_remote_jid"`
+	QuoteFromMe    bool       `json:"quote_from_me"`
 	Participant    *types.JID `json:"participant"`
 }
 
@@ -42,32 +44,32 @@ func (s *Whatsmiau) SendText(ctx context.Context, data *SendText) (*SendTextResp
 	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
 	data.RemoteJID = &resolved
 
-	//rJid := data.RemoteJID.ToNonAD().String()
-	var extendedMessage *waE2E.ExtendedTextMessage
+	// Monta ExtendedTextMessage com ContextInfo quando ha quoted message
+	var msg *waE2E.Message
 	if len(data.QuoteMessage) > 0 && len(data.QuoteMessageID) > 0 {
-		extendedMessage = &waE2E.ExtendedTextMessage{
-			//ContextInfo: &waE2E.ContextInfo{ // TODO: implement quoted message
-			//	StanzaID:    &data.QuoteMessageID,
-			//	Participant: &rJid,
-			//	QuotedMessage: &waE2E.Message{
-			//		Conversation: &data.QuoteMessage,
-			//		ProtocolMessage: &waE2E.ProtocolMessage{
-			//			Key: &waCommon.MessageKey{
-			//				RemoteJID:   &rJid,
-			//				FromMe:      &[]bool{true}[0],
-			//				ID:          &data.QuoteMessageID,
-			//				Participant: nil,
-			//			},
-			//		},
-			//	},
-			//},
+		remoteJidStr := data.QuoteRemoteJid
+		if remoteJidStr == "" {
+			remoteJidStr = data.RemoteJID.ToNonAD().String()
 		}
+		fromMe := data.QuoteFromMe
+		msg = &waE2E.Message{
+			ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+				Text: &data.Text,
+				ContextInfo: &waE2E.ContextInfo{
+					StanzaID:    &data.QuoteMessageID,
+					Participant: &remoteJidStr,
+					QuotedMessage: &waE2E.Message{
+						Conversation: &data.QuoteMessage,
+					},
+				},
+			},
+		}
+		_ = fromMe
+	} else {
+		msg = &waE2E.Message{Conversation: &data.Text}
 	}
 
-	res, err := client.SendMessage(ctx, *data.RemoteJID, &waE2E.Message{
-		Conversation:        &data.Text,
-		ExtendedTextMessage: extendedMessage,
-	})
+	res, err := client.SendMessage(ctx, *data.RemoteJID, msg)
 	if err != nil {
 		return nil, err
 	}

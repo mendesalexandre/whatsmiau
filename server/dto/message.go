@@ -34,7 +34,9 @@ type MessageRequestQuoted struct {
 }
 
 type QuotedKey struct {
-	Id string `json:"id,omitempty"`
+	Id        string `json:"id,omitempty"`
+	RemoteJid string `json:"remoteJid,omitempty"`
+	FromMe    bool   `json:"fromMe,omitempty"`
 }
 
 type QuotedMessage struct {

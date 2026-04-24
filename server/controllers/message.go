@@ -69,6 +69,8 @@ func (s *Message) SendText(ctx echo.Context) error {
 	if request.Quoted != nil && len(request.Quoted.Key.Id) > 0 && len(request.Quoted.Message.Conversation) > 0 {
 		sendText.QuoteMessage = request.Quoted.Message.Conversation
 		sendText.QuoteMessageID = request.Quoted.Key.Id
+		sendText.QuoteRemoteJid = request.Quoted.Key.RemoteJid
+		sendText.QuoteFromMe = request.Quoted.Key.FromMe
 	}
 
 	c := ctx.Request().Context()
