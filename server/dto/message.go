@@ -195,7 +195,7 @@ type SendReactionRequest struct {
 	Key        struct {
 		RemoteJid string `json:"remoteJid,omitempty" validate:"required"`
 		Id        string `json:"id,omitempty" validate:"required"`
-		FromMe    bool   `json:"fromMe,omitempty" validate:"required"`
+		FromMe    bool   `json:"fromMe,omitempty"`
 	} `json:"key"`
 }
 
