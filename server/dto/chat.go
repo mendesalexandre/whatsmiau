@@ -53,3 +53,17 @@ type FetchProfilePictureUrlResponse struct {
 	Wuid              string `json:"wuid"`
 	ProfilePictureURL string `json:"profilePictureUrl"`
 }
+
+// DeleteMessageForEveryoneRequest — payload pra apagar (revoke) uma mensagem
+// no WhatsApp pra todos os participantes. Aceita o formato Evolution API:
+// { key: { remoteJid, fromMe, id } }.
+type DeleteMessageForEveryoneRequest struct {
+	InstanceID string                             `param:"instance" validate:"required" swaggerignore:"true"`
+	Key        DeleteMessageForEveryoneRequestKey `json:"key" validate:"required"`
+}
+
+type DeleteMessageForEveryoneRequestKey struct {
+	RemoteJid string `json:"remoteJid" validate:"required"`
+	FromMe    bool   `json:"fromMe"`
+	ID        string `json:"id" validate:"required"`
+}

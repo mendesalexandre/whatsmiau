@@ -16,6 +16,7 @@ func Chat(group *echo.Group) {
 	group.POST("/read-messages", controller.ReadMessages)
 	group.POST("/download-media", controller.GetBase64FromMediaMessage)
 	group.POST("/profile-picture-url", controller.FetchProfilePictureUrl)
+	group.POST("/delete-message-for-everyone", controller.DeleteMessageForEveryone)
 }
 
 func ChatEVO(group *echo.Group) {
@@ -28,4 +29,5 @@ func ChatEVO(group *echo.Group) {
 	group.POST("/whatsappNumbers/:instance", controller.NumberExists)
 	group.POST("/getBase64FromMediaMessage/:instance", controller.GetBase64FromMediaMessage)
 	group.POST("/fetchProfilePictureUrl/:instance", controller.FetchProfilePictureUrl)
+	group.POST("/deleteMessageForEveryone/:instance", controller.DeleteMessageForEveryone)
 }

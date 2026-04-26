@@ -291,3 +291,47 @@ func (s *Chat) FetchProfilePictureUrl(ctx echo.Context) error {
 		ProfilePictureURL: response.ProfilePictureURL,
 	})
 }
+
+// DeleteMessageForEveryone godoc
+// @Summary      Revoke a sent message for everyone
+// @Description  Deletes a previously sent message from WhatsApp ("apagar pra todos"). Only works on
+// @Description  messages sent by the bot/instance and within ~2 days from when they were sent.
+// @Tags         Chat
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string                              true  "Instance ID"
+// @Param        body      body      dto.DeleteMessageForEveryoneRequest  true  "Message key to revoke"
+// @Success      200       {object}  map[string]interface{}              "Empty object on success"
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      404       {object}  utils.HTTPErrorResponse
+// @Failure      422       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /instance/{instance}/chat/delete-message-for-everyone [post]
+// @Router       /chat/deleteMessageForEveryone/{instance} [post]
+func (s *Chat) DeleteMessageForEveryone(ctx echo.Context) error {
+	var request dto.DeleteMessageForEveryoneRequest
+	if err := ctx.Bind(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+	}
+
+	if err := validator.New().Struct(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+	}
+
+	jid, err := numberToJid(request.Key.RemoteJid)
+	if err != nil {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid remoteJid")
+	}
+
+	if err := s.whatsmiau.RevokeMessage(&whatsmiau.RevokeMessageRequest{
+		InstanceID: request.InstanceID,
+		RemoteJID:  jid,
+		MessageID:  request.Key.ID,
+	}); err != nil {
+		zap.L().Error("Whatsmiau.RevokeMessage failed", zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to revoke message")
+	}
+
+	return ctx.JSON(http.StatusOK, map[string]interface{}{})
+}

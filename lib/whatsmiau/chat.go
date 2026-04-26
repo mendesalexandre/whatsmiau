@@ -160,6 +160,42 @@ func (s *Whatsmiau) FetchProfilePictureUrl(ctx context.Context, data *FetchProfi
 	return resp, nil
 }
 
+// RevokeMessageRequest — apaga uma mensagem pra todos no WhatsApp ("revoke").
+// Funciona apenas em mensagens enviadas pelo próprio cliente e dentro da
+// janela de ~2 dias do WhatsApp. Quem decide se está dentro da janela é o
+// próprio servidor do WhatsApp — aqui só montamos o protocolo.
+type RevokeMessageRequest struct {
+	InstanceID string     `json:"instance_id"`
+	RemoteJID  *types.JID `json:"remote_jid"`
+	MessageID  string     `json:"message_id"`
+}
+
+func (s *Whatsmiau) RevokeMessage(data *RevokeMessageRequest) error {
+	client, ok := s.clients.Load(data.InstanceID)
+	if !ok {
+		return whatsmeow.ErrClientIsNil
+	}
+
+	if client.Store.ID == nil {
+		return whatsmeow.ErrNotLoggedIn
+	}
+
+	if data.RemoteJID == nil {
+		return whatsmeow.ErrUnknownServer
+	}
+
+	// BuildRevoke: pra mensagens em chat 1-1, sender deve ser EmptyJID; pra grupos,
+	// é o próprio JID do cliente. whatsmeow lida com ambos os casos internamente.
+	sender := types.EmptyJID
+	if data.RemoteJID.Server == types.GroupServer {
+		sender = client.Store.ID.ToNonAD()
+	}
+
+	revoke := client.BuildRevoke(*data.RemoteJID, sender, data.MessageID)
+	_, err := client.SendMessage(context.TODO(), *data.RemoteJID, revoke)
+	return err
+}
+
 func (s *Whatsmiau) resolveJID(ctx context.Context, client *whatsmeow.Client, jid types.JID) types.JID {
 	if jid.Server != types.DefaultUserServer {
 		return jid
