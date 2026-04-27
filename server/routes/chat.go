@@ -17,6 +17,7 @@ func Chat(group *echo.Group) {
 	group.POST("/download-media", controller.GetBase64FromMediaMessage)
 	group.POST("/profile-picture-url", controller.FetchProfilePictureUrl)
 	group.POST("/delete-message-for-everyone", controller.DeleteMessageForEveryone)
+	group.POST("/edit-message", controller.EditMessage)
 }
 
 func ChatEVO(group *echo.Group) {
@@ -30,4 +31,5 @@ func ChatEVO(group *echo.Group) {
 	group.POST("/getBase64FromMediaMessage/:instance", controller.GetBase64FromMediaMessage)
 	group.POST("/fetchProfilePictureUrl/:instance", controller.FetchProfilePictureUrl)
 	group.POST("/deleteMessageForEveryone/:instance", controller.DeleteMessageForEveryone)
+	group.POST("/editMessage/:instance", controller.EditMessage)
 }

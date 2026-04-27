@@ -6,9 +6,11 @@ import (
 	"time"
 
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
+	"google.golang.org/protobuf/proto"
 )
 
 // ErrEmptyNumber is returned when FetchProfilePictureUrl is called with a
@@ -193,6 +195,48 @@ func (s *Whatsmiau) RevokeMessage(data *RevokeMessageRequest) error {
 
 	revoke := client.BuildRevoke(*data.RemoteJID, sender, data.MessageID)
 	_, err := client.SendMessage(context.TODO(), *data.RemoteJID, revoke)
+	return err
+}
+
+// EditMessageRequest — edita uma mensagem já enviada. WhatsApp permite
+// editar até ~15min após o envio (enforced server-side). Funciona apenas
+// em mensagens enviadas pelo próprio cliente. Pra V1 só aceita texto
+// (Conversation); legenda de mídia exige outro shape de Message.
+type EditMessageRequest struct {
+	InstanceID string     `json:"instance_id"`
+	RemoteJID  *types.JID `json:"remote_jid"`
+	MessageID  string     `json:"message_id"`
+	NewText    string     `json:"new_text"`
+}
+
+func (s *Whatsmiau) EditMessage(data *EditMessageRequest) error {
+	client, ok := s.clients.Load(data.InstanceID)
+	if !ok {
+		return whatsmeow.ErrClientIsNil
+	}
+
+	if client.Store.ID == nil {
+		return whatsmeow.ErrNotLoggedIn
+	}
+
+	if data.RemoteJID == nil {
+		return whatsmeow.ErrUnknownServer
+	}
+
+	if strings.TrimSpace(data.NewText) == "" {
+		return errors.New("new_text is empty")
+	}
+
+	if data.MessageID == "" {
+		return errors.New("message_id is empty")
+	}
+
+	newContent := &waE2E.Message{
+		Conversation: proto.String(data.NewText),
+	}
+
+	edited := client.BuildEdit(*data.RemoteJID, data.MessageID, newContent)
+	_, err := client.SendMessage(context.TODO(), *data.RemoteJID, edited)
 	return err
 }
 

@@ -273,3 +273,38 @@ type SendButtonsResponse struct {
 	MessageTimestamp int64                `json:"messageTimestamp"`
 	InstanceId       string             `json:"instanceId"`
 }
+
+// --- sendInteractiveCopyCode DTOs ---
+
+type SendInteractiveCopyCodeButton struct {
+	DisplayText string `json:"displayText" validate:"required"`
+	CopyCode    string `json:"copyCode" validate:"required"`
+}
+
+type SendInteractiveCopyCodeRequest struct {
+	InstanceID string `param:"instance" validate:"required" swaggerignore:"true"`
+	Number     string `json:"number" validate:"required"`
+
+	// Header (optional). Type accepts "document", "image" or "" (no media).
+	HeaderType     string `json:"headerType" validate:"omitempty,oneof=document image"`
+	HeaderMediaURL string `json:"headerMediaUrl" validate:"required_with=HeaderType,omitempty,url"`
+	HeaderMimetype string `json:"headerMimetype"`
+	HeaderFileName string `json:"headerFileName"`
+	HeaderTitle    string `json:"headerTitle"`
+	HeaderSubtitle string `json:"headerSubtitle"`
+
+	Body   string `json:"body" validate:"required"`
+	Footer string `json:"footer"`
+
+	Buttons []SendInteractiveCopyCodeButton `json:"buttons" validate:"required,min=1,max=5,dive"`
+
+	Delay int `json:"delay,omitempty" validate:"omitempty,min=0,max=300000"`
+}
+
+type SendInteractiveCopyCodeResponse struct {
+	Key              MessageResponseKey `json:"key"`
+	Status           string             `json:"status"`
+	MessageType      string             `json:"messageType"`
+	MessageTimestamp int64              `json:"messageTimestamp"`
+	InstanceId       string             `json:"instanceId"`
+}

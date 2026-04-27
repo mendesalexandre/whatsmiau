@@ -335,3 +335,48 @@ func (s *Chat) DeleteMessageForEveryone(ctx echo.Context) error {
 
 	return ctx.JSON(http.StatusOK, map[string]interface{}{})
 }
+
+// EditMessage godoc
+// @Summary      Edit a previously sent message
+// @Description  Edits a message that was already sent via this instance. WhatsApp enforces a ~15min
+// @Description  window server-side. Only text (Conversation) is supported in V1; caption editing
+// @Description  for media will need a separate Message shape.
+// @Tags         Chat
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string                  true  "Instance ID"
+// @Param        body      body      dto.EditMessageRequest  true  "Message key + new conversation text"
+// @Success      200       {object}  map[string]interface{}  "Empty object on success"
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      422       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /instance/{instance}/chat/edit-message [post]
+// @Router       /chat/editMessage/{instance} [post]
+func (s *Chat) EditMessage(ctx echo.Context) error {
+	var request dto.EditMessageRequest
+	if err := ctx.Bind(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+	}
+
+	if err := validator.New().Struct(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+	}
+
+	jid, err := numberToJid(request.Key.RemoteJid)
+	if err != nil {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid remoteJid")
+	}
+
+	if err := s.whatsmiau.EditMessage(&whatsmiau.EditMessageRequest{
+		InstanceID: request.InstanceID,
+		RemoteJID:  jid,
+		MessageID:  request.Key.ID,
+		NewText:    request.Message.Conversation,
+	}); err != nil {
+		zap.L().Error("Whatsmiau.EditMessage failed", zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to edit message")
+	}
+
+	return ctx.JSON(http.StatusOK, map[string]interface{}{})
+}

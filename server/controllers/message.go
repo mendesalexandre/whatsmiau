@@ -691,3 +691,90 @@ func (s *Message) sendPixButtons(ctx echo.Context, c context.Context, request dt
 		InstanceId:       request.InstanceID,
 	})
 }
+
+// SendInteractiveCopyCode godoc
+// @Summary      Send an interactive message with cta_copy buttons
+// @Description  InteractiveMessage with optional document/image header, body,
+//               optional footer and one or more "Copy code" buttons. Used for
+//               billing/payment scenarios where the customer copies a PIX
+//               brcode and/or boleto digit line.
+// @Tags         Message
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string                                 true  "Instance ID"
+// @Param        body      body      dto.SendInteractiveCopyCodeRequest     true  "Interactive copy-code parameters"
+// @Success      200       {object}  dto.SendInteractiveCopyCodeResponse
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      422       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /instance/{instance}/message/interactive-copy-code [post]
+// @Router       /message/sendInteractiveCopyCode/{instance} [post]
+func (s *Message) SendInteractiveCopyCode(ctx echo.Context) error {
+	var request dto.SendInteractiveCopyCodeRequest
+	if err := ctx.Bind(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+	}
+
+	if err := validator.New().Struct(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+	}
+
+	jid, err := numberToJid(request.Number)
+	if err != nil {
+		zap.L().Error("error converting number to jid", zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid number format")
+	}
+
+	c := ctx.Request().Context()
+
+	if err := s.whatsmiau.ChatPresence(&whatsmiau.ChatPresenceRequest{
+		InstanceID: request.InstanceID,
+		RemoteJID:  jid,
+		Presence:   types.ChatPresenceComposing,
+	}); err != nil {
+		zap.L().Error("Whatsmiau.ChatPresence", zap.Error(err))
+	} else if request.Delay > 0 {
+		time.Sleep(time.Millisecond * time.Duration(request.Delay))
+	}
+
+	buttons := make([]whatsmiau.SendInteractiveCopyCodeButton, 0, len(request.Buttons))
+	for _, b := range request.Buttons {
+		buttons = append(buttons, whatsmiau.SendInteractiveCopyCodeButton{
+			DisplayText: b.DisplayText,
+			CopyCode:    b.CopyCode,
+		})
+	}
+
+	sendData := &whatsmiau.SendInteractiveCopyCodeRequest{
+		InstanceID:     request.InstanceID,
+		RemoteJID:      jid,
+		HeaderType:     request.HeaderType,
+		HeaderMediaURL: request.HeaderMediaURL,
+		HeaderMimetype: request.HeaderMimetype,
+		HeaderFileName: request.HeaderFileName,
+		HeaderTitle:    request.HeaderTitle,
+		HeaderSubtitle: request.HeaderSubtitle,
+		Body:           request.Body,
+		Footer:         request.Footer,
+		Buttons:        buttons,
+	}
+
+	res, err := s.whatsmiau.SendInteractiveCopyCode(c, sendData)
+	if err != nil {
+		zap.L().Error("Whatsmiau.SendInteractiveCopyCode failed", zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to send interactive message")
+	}
+
+	return ctx.JSON(http.StatusOK, dto.SendInteractiveCopyCodeResponse{
+		Key: dto.MessageResponseKey{
+			RemoteJid: request.Number,
+			FromMe:    true,
+			Id:        res.ID,
+		},
+		Status:           "sent",
+		MessageType:      "interactiveMessage",
+		MessageTimestamp: res.CreatedAt.UnixMilli(),
+		InstanceId:       request.InstanceID,
+	})
+}
