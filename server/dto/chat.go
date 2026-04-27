@@ -67,3 +67,22 @@ type DeleteMessageForEveryoneRequestKey struct {
 	FromMe    bool   `json:"fromMe"`
 	ID        string `json:"id" validate:"required"`
 }
+
+// EditMessageRequest — payload pra editar uma mensagem já enviada.
+// WhatsApp permite editar até ~15min após envio (enforced server-side).
+// V1 só aceita texto (Conversation).
+type EditMessageRequest struct {
+	InstanceID string                `param:"instance" validate:"required" swaggerignore:"true"`
+	Key        EditMessageRequestKey `json:"key" validate:"required"`
+	Message    EditMessageContent    `json:"message" validate:"required"`
+}
+
+type EditMessageRequestKey struct {
+	RemoteJid string `json:"remoteJid" validate:"required"`
+	FromMe    bool   `json:"fromMe"`
+	ID        string `json:"id" validate:"required"`
+}
+
+type EditMessageContent struct {
+	Conversation string `json:"conversation" validate:"required"`
+}
