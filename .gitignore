@@ -1,4 +1,5 @@
 .idea
 .env
 *.json
-*.dbdocker-compose.override.yml
+*.db
+docker-compose.override.yml
