@@ -271,6 +271,22 @@ func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *
 		return
 	}
 
+	// Auto mark-as-read: when the instance has ReadMessages=true, ack inbound
+	// messages so the sender sees 2 blue checks within seconds.
+	//
+	// Why this is needed: whatsmeow does NOT send delivery/read receipts
+	// automatically at the protocol level for received messages — the linked
+	// device receives the encrypted msg, decrypts it, fires this event, and
+	// stops there. Without an explicit ack, the sender's WhatsApp keeps the
+	// message stuck at 1 check forever.
+	//
+	// Fired in a goroutine so we never block the webhook emission below; the
+	// receipt is best-effort and a failure shouldn't delay or break the
+	// webhook flow.
+	if instance.ReadMessages && !e.Info.IsFromMe && e.Info.ID != "" {
+		go s.markIncomingAsRead(id, e)
+	}
+
 	messageData := s.convertEventMessage(id, instance, e)
 	if messageData == nil {
 		zap.L().Error("failed to convert event", zap.String("id", id), zap.String("type", fmt.Sprintf("%T", e)), zap.Any("raw", e))
@@ -346,6 +362,29 @@ func (s *Whatsmiau) handleMessageDeleteEvent(id string, instance *models.Instanc
 
 	zap.L().Debug("message delete event", zap.String("instance", id), zap.Any("data", deleteData))
 	s.emit(wookEvent, instance.Webhook.Url)
+}
+
+// markIncomingAsRead sends a read receipt for a single inbound message. Used
+// by handleMessageEvent's auto-read path. Logs at Debug level on failure
+// because best-effort: a transient error here just means the sender stays at
+// 1 check until the operator opens the conversation in CartZap (which calls
+// the same MarkRead API explicitly).
+func (s *Whatsmiau) markIncomingAsRead(instanceID string, e *events.Message) {
+	chat := e.Info.Chat
+	sender := e.Info.Sender
+
+	err := s.ReadMessage(&ReadMessageRequest{
+		MessageIDs: []string{e.Info.ID},
+		InstanceID: instanceID,
+		RemoteJID:  &chat,
+		Sender:     &sender,
+	})
+	if err != nil {
+		zap.L().Debug("auto mark-as-read failed",
+			zap.String("instance", instanceID),
+			zap.String("messageID", e.Info.ID),
+			zap.Error(err))
+	}
 }
 
 func (s *Whatsmiau) handleReceiptEvent(id string, instance *models.Instance, e *events.Receipt, eventMap map[string]bool) {
