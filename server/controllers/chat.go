@@ -380,3 +380,59 @@ func (s *Chat) EditMessage(ctx echo.Context) error {
 
 	return ctx.JSON(http.StatusOK, map[string]interface{}{})
 }
+
+// UpdatePrivacySettings godoc
+// @Summary      Update WhatsApp privacy settings (read receipts, last seen, etc.)
+// @Description  Changes one or more WhatsApp privacy settings on the linked account. Each field is
+// @Description  optional — only fields with a non-empty value are applied. Fields are applied
+// @Description  independently, so a single bad field does not block the others; per-field errors are
+// @Description  reported in the response. Note: read receipts is bilateral — turning it off means
+// @Description  you neither send nor see read receipts (2 blue ticks).
+// @Tags         Chat
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string                            true  "Instance ID"
+// @Param        body      body      dto.UpdatePrivacySettingsRequest  true  "Privacy fields to update"
+// @Success      200       {object}  dto.UpdatePrivacySettingsResponse
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      422       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /instance/{instance}/chat/privacy-settings [post]
+// @Router       /chat/updatePrivacySettings/{instance} [post]
+func (s *Chat) UpdatePrivacySettings(ctx echo.Context) error {
+	var request dto.UpdatePrivacySettingsRequest
+	if err := ctx.Bind(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+	}
+
+	if err := validator.New().Struct(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+	}
+
+	result, err := s.whatsmiau.UpdatePrivacySettings(ctx.Request().Context(), &whatsmiau.UpdatePrivacySettingsRequest{
+		InstanceID:   request.InstanceID,
+		ReadReceipts: request.ReadReceipts,
+		Profile:      request.Profile,
+		GroupAdd:     request.GroupAdd,
+		Last:         request.Last,
+		Status:       request.Status,
+		Online:       request.Online,
+		CallAdd:      request.CallAdd,
+	})
+	if err != nil {
+		if errors.Is(err, whatsmeow.ErrClientIsNil) {
+			return utils.HTTPFail(ctx, http.StatusNotFound, err, "instance not found or not connected")
+		}
+		if errors.Is(err, whatsmeow.ErrNotLoggedIn) {
+			return utils.HTTPFail(ctx, http.StatusBadRequest, err, "instance is not logged in")
+		}
+		zap.L().Error("Whatsmiau.UpdatePrivacySettings failed", zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to update privacy settings")
+	}
+
+	return ctx.JSON(http.StatusOK, dto.UpdatePrivacySettingsResponse{
+		Applied: result.Applied,
+		Errors:  result.Errors,
+	})
+}

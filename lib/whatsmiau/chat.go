@@ -269,3 +269,80 @@ func (s *Whatsmiau) resolveJID(ctx context.Context, client *whatsmeow.Client, ji
 
 	return jid
 }
+
+// UpdatePrivacySettingsRequest changes one or more privacy settings on the
+// linked WhatsApp account. Common keys mirror what the WhatsApp app shows
+// under Settings > Privacy:
+//
+//	readreceipts -> "all" or "none"
+//	profile      -> "all" | "contacts" | "contact_blacklist" | "none"
+//	groupadd     -> "all" | "contacts" | "contact_blacklist"
+//	last         -> "all" | "contacts" | "contact_blacklist" | "none"
+//	status       -> "all" | "contacts" | "contact_blacklist" | "none"
+//	online       -> "all" | "match_last_seen"
+//	calladd      -> "all" | "known"
+//
+// Settings are applied independently and we keep going on partial failure
+// so a typo in one field doesn't block the others. Errors are returned for
+// observability.
+type UpdatePrivacySettingsRequest struct {
+	InstanceID   string `json:"instance_id"`
+	ReadReceipts string `json:"readreceipts,omitempty"`
+	Profile      string `json:"profile,omitempty"`
+	GroupAdd     string `json:"groupadd,omitempty"`
+	Last         string `json:"last,omitempty"`
+	Status       string `json:"status,omitempty"`
+	Online       string `json:"online,omitempty"`
+	CallAdd      string `json:"calladd,omitempty"`
+}
+
+// UpdatePrivacySettingsResult lists which keys actually changed and any
+// per-key errors. Callers can decide to surface partial success as 200 or
+// downgrade to 4xx based on their semantics.
+type UpdatePrivacySettingsResult struct {
+	Applied map[string]string `json:"applied"`
+	Errors  map[string]string `json:"errors,omitempty"`
+}
+
+func (s *Whatsmiau) UpdatePrivacySettings(ctx context.Context, data *UpdatePrivacySettingsRequest) (*UpdatePrivacySettingsResult, error) {
+	client, ok := s.clients.Load(data.InstanceID)
+	if !ok {
+		return nil, whatsmeow.ErrClientIsNil
+	}
+
+	if client.Store == nil || client.Store.ID == nil {
+		return nil, whatsmeow.ErrNotLoggedIn
+	}
+
+	pairs := []struct {
+		name  types.PrivacySettingType
+		value string
+	}{
+		{types.PrivacySettingTypeReadReceipts, data.ReadReceipts},
+		{types.PrivacySettingTypeProfile, data.Profile},
+		{types.PrivacySettingTypeGroupAdd, data.GroupAdd},
+		{types.PrivacySettingTypeLastSeen, data.Last},
+		{types.PrivacySettingTypeStatus, data.Status},
+		{types.PrivacySettingTypeOnline, data.Online},
+		{types.PrivacySettingTypeCallAdd, data.CallAdd},
+	}
+
+	result := &UpdatePrivacySettingsResult{
+		Applied: map[string]string{},
+		Errors:  map[string]string{},
+	}
+
+	for _, p := range pairs {
+		if p.value == "" {
+			continue
+		}
+		_, err := client.SetPrivacySetting(ctx, p.name, types.PrivacySetting(p.value))
+		if err != nil {
+			result.Errors[string(p.name)] = err.Error()
+			continue
+		}
+		result.Applied[string(p.name)] = p.value
+	}
+
+	return result, nil
+}
