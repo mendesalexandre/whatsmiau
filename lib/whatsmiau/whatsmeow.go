@@ -87,6 +87,13 @@ func LoadMiau(ctx context.Context, container *sqlstore.Container) {
 		instanceFound, ok := instanceByRemoteJid[client.Store.ID.String()]
 		if ok {
 			configProxy(client, instanceFound.InstanceProxy)
+			// Force delivery receipts to render as the standard 2 gray ticks on
+			// the sender's WhatsApp. By default whatsmeow sends type="inactive"
+			// receipts when the client isn't marked as online — the server still
+			// accepts them, but neither the WhatsApp app nor Web renders them
+			// as delivered. SetForceActiveDeliveryReceipts(true) tells whatsmeow
+			// to always send active delivery acks, regardless of presence state.
+			client.SetForceActiveDeliveryReceipts(true)
 			clients.Store(instanceFound.ID, client)
 			if err := client.Connect(); err != nil {
 				zap.L().Error("failed to connect connected device", zap.Error(err), zap.String("jid", client.Store.ID.String()))
@@ -175,6 +182,10 @@ func (s *Whatsmiau) generateClient(ctx context.Context, id string) (*whatsmeow.C
 			configProxy(client, instanceFound.InstanceProxy)
 		}
 
+		// Always render delivery receipts as 2 gray ticks (see whatsmeow.go LoadMiau
+		// for full rationale). Safe to call even after Connect.
+		client.SetForceActiveDeliveryReceipts(true)
+
 		if client.IsLoggedIn() {
 			return nil, nil
 		}
@@ -249,6 +260,8 @@ func (s *Whatsmiau) observeConnection(client *whatsmeow.Client, id string, phone
 	if instanceFound := s.getInstance(id); instanceFound != nil {
 		configProxy(client, instanceFound.InstanceProxy)
 	}
+	// Force standard delivery acks (see LoadMiau for rationale).
+	client.SetForceActiveDeliveryReceipts(true)
 	if err := client.Connect(); err != nil {
 		zap.L().Error("failed to connect connected device", zap.Error(err))
 		return
