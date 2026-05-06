@@ -370,33 +370,49 @@ func (s *Whatsmiau) handleMessageDeleteEvent(id string, instance *models.Instanc
 // 1 check until the operator opens the conversation in CartZap (which calls
 // the same MarkRead API explicitly).
 //
-// TEMPORARY DIAGNOSTIC: logging at Info level for both success and failure
-// while we investigate why senders still see 1 check. Revert to Debug-only
-// failure log once auto-read is confirmed working in production.
+// LID resolution: WhatsApp delivers some message events with @lid (Linked
+// Device internal ID) JIDs instead of @s.whatsapp.net. Calling MarkRead with
+// @lid succeeds at the API level but the receipt never propagates back to
+// the sender's device — they keep seeing 1 check. GetJidLid resolves the
+// canonical phone-number JID before sending the receipt.
 func (s *Whatsmiau) markIncomingAsRead(instanceID string, e *events.Message) {
-	chat := e.Info.Chat
-	sender := e.Info.Sender
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 
-	err := s.ReadMessage(&ReadMessageRequest{
+	chatStr, _ := s.GetJidLid(ctx, instanceID, e.Info.Chat)
+	senderStr, _ := s.GetJidLid(ctx, instanceID, e.Info.Sender)
+
+	chat, err := types.ParseJID(chatStr)
+	if err != nil {
+		zap.L().Debug("auto mark-as-read: failed to parse chat JID",
+			zap.String("instance", instanceID),
+			zap.String("chat_raw", chatStr),
+			zap.Error(err))
+		return
+	}
+	sender, err := types.ParseJID(senderStr)
+	if err != nil {
+		zap.L().Debug("auto mark-as-read: failed to parse sender JID",
+			zap.String("instance", instanceID),
+			zap.String("sender_raw", senderStr),
+			zap.Error(err))
+		return
+	}
+
+	err = s.ReadMessage(&ReadMessageRequest{
 		MessageIDs: []string{e.Info.ID},
 		InstanceID: instanceID,
 		RemoteJID:  &chat,
 		Sender:     &sender,
 	})
 	if err != nil {
-		zap.L().Info("auto mark-as-read FAILED",
+		zap.L().Debug("auto mark-as-read failed",
 			zap.String("instance", instanceID),
 			zap.String("messageID", e.Info.ID),
 			zap.String("chat", chat.String()),
 			zap.String("sender", sender.String()),
 			zap.Error(err))
-		return
 	}
-	zap.L().Info("auto mark-as-read OK",
-		zap.String("instance", instanceID),
-		zap.String("messageID", e.Info.ID),
-		zap.String("chat", chat.String()),
-		zap.String("sender", sender.String()))
 }
 
 func (s *Whatsmiau) handleReceiptEvent(id string, instance *models.Instance, e *events.Receipt, eventMap map[string]bool) {
