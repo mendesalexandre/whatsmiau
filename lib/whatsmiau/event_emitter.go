@@ -384,7 +384,7 @@ func (s *Whatsmiau) markIncomingAsRead(instanceID string, e *events.Message) {
 
 	chat, err := types.ParseJID(chatStr)
 	if err != nil {
-		zap.L().Debug("auto mark-as-read: failed to parse chat JID",
+		zap.L().Info("auto mark-as-read: failed to parse chat JID",
 			zap.String("instance", instanceID),
 			zap.String("chat_raw", chatStr),
 			zap.Error(err))
@@ -392,7 +392,7 @@ func (s *Whatsmiau) markIncomingAsRead(instanceID string, e *events.Message) {
 	}
 	sender, err := types.ParseJID(senderStr)
 	if err != nil {
-		zap.L().Debug("auto mark-as-read: failed to parse sender JID",
+		zap.L().Info("auto mark-as-read: failed to parse sender JID",
 			zap.String("instance", instanceID),
 			zap.String("sender_raw", senderStr),
 			zap.Error(err))
@@ -406,13 +406,23 @@ func (s *Whatsmiau) markIncomingAsRead(instanceID string, e *events.Message) {
 		Sender:     &sender,
 	})
 	if err != nil {
-		zap.L().Debug("auto mark-as-read failed",
+		zap.L().Info("auto mark-as-read FAILED",
 			zap.String("instance", instanceID),
 			zap.String("messageID", e.Info.ID),
-			zap.String("chat", chat.String()),
-			zap.String("sender", sender.String()),
+			zap.String("origChat", e.Info.Chat.String()),
+			zap.String("origSender", e.Info.Sender.String()),
+			zap.String("resolvedChat", chat.String()),
+			zap.String("resolvedSender", sender.String()),
 			zap.Error(err))
+		return
 	}
+	zap.L().Info("auto mark-as-read OK",
+		zap.String("instance", instanceID),
+		zap.String("messageID", e.Info.ID),
+		zap.String("origChat", e.Info.Chat.String()),
+		zap.String("origSender", e.Info.Sender.String()),
+		zap.String("resolvedChat", chat.String()),
+		zap.String("resolvedSender", sender.String()))
 }
 
 func (s *Whatsmiau) handleReceiptEvent(id string, instance *models.Instance, e *events.Receipt, eventMap map[string]bool) {
