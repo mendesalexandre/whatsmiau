@@ -369,6 +369,10 @@ func (s *Whatsmiau) handleMessageDeleteEvent(id string, instance *models.Instanc
 // because best-effort: a transient error here just means the sender stays at
 // 1 check until the operator opens the conversation in CartZap (which calls
 // the same MarkRead API explicitly).
+//
+// TEMPORARY DIAGNOSTIC: logging at Info level for both success and failure
+// while we investigate why senders still see 1 check. Revert to Debug-only
+// failure log once auto-read is confirmed working in production.
 func (s *Whatsmiau) markIncomingAsRead(instanceID string, e *events.Message) {
 	chat := e.Info.Chat
 	sender := e.Info.Sender
@@ -380,11 +384,19 @@ func (s *Whatsmiau) markIncomingAsRead(instanceID string, e *events.Message) {
 		Sender:     &sender,
 	})
 	if err != nil {
-		zap.L().Debug("auto mark-as-read failed",
+		zap.L().Info("auto mark-as-read FAILED",
 			zap.String("instance", instanceID),
 			zap.String("messageID", e.Info.ID),
+			zap.String("chat", chat.String()),
+			zap.String("sender", sender.String()),
 			zap.Error(err))
+		return
 	}
+	zap.L().Info("auto mark-as-read OK",
+		zap.String("instance", instanceID),
+		zap.String("messageID", e.Info.ID),
+		zap.String("chat", chat.String()),
+		zap.String("sender", sender.String()))
 }
 
 func (s *Whatsmiau) handleReceiptEvent(id string, instance *models.Instance, e *events.Receipt, eventMap map[string]bool) {
