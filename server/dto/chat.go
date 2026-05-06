@@ -86,3 +86,32 @@ type EditMessageRequestKey struct {
 type EditMessageContent struct {
 	Conversation string `json:"conversation" validate:"required"`
 }
+
+// UpdatePrivacySettingsRequest mirrors Evolution's
+// POST /chat/updatePrivacySettings/{instance}. Each field is optional —
+// only fields explicitly set are applied. Empty string = unchanged.
+//
+// Valid values per field (whatsmeow types/user.go):
+//
+//	readreceipts: "all" | "none"
+//	profile:      "all" | "contacts" | "contact_blacklist" | "none"
+//	groupadd:     "all" | "contacts" | "contact_blacklist"
+//	last:         "all" | "contacts" | "contact_blacklist" | "none"
+//	status:       "all" | "contacts" | "contact_blacklist" | "none"
+//	online:       "all" | "match_last_seen"
+//	calladd:      "all" | "known"
+type UpdatePrivacySettingsRequest struct {
+	InstanceID   string `param:"instance" validate:"required" swaggerignore:"true"`
+	ReadReceipts string `json:"readreceipts,omitempty" validate:"omitempty,oneof=all none"`
+	Profile      string `json:"profile,omitempty" validate:"omitempty,oneof=all contacts contact_blacklist none"`
+	GroupAdd     string `json:"groupadd,omitempty" validate:"omitempty,oneof=all contacts contact_blacklist"`
+	Last         string `json:"last,omitempty" validate:"omitempty,oneof=all contacts contact_blacklist none"`
+	Status       string `json:"status,omitempty" validate:"omitempty,oneof=all contacts contact_blacklist none"`
+	Online       string `json:"online,omitempty" validate:"omitempty,oneof=all match_last_seen"`
+	CallAdd      string `json:"calladd,omitempty" validate:"omitempty,oneof=all known"`
+}
+
+type UpdatePrivacySettingsResponse struct {
+	Applied map[string]string `json:"applied"`
+	Errors  map[string]string `json:"errors,omitempty"`
+}
