@@ -949,6 +949,24 @@ func (s *Whatsmiau) parseWAMessage(m *waE2E.Message) (string, *WookMessageRaw, *
 			Options:                options,
 			SelectableOptionsCount: poll.GetSelectableOptionsCount(),
 		}
+	} else if poll := m.GetPollCreationMessageV3(); poll != nil {
+		messageType = "pollCreationMessageV3"
+
+		ci = poll.GetContextInfo()
+
+		options := make([]WookPollOption, 0, len(poll.GetOptions()))
+		for _, opt := range poll.GetOptions() {
+			options = append(options, WookPollOption{
+				OptionName: opt.GetOptionName(),
+			})
+		}
+
+		raw.PollCreationMessage = &WookPollCreationMessageRaw{
+			Name:                   poll.GetName(),
+			Options:                options,
+			SelectableOptionsCount: poll.GetSelectableOptionsCount(),
+		}
+
 	} else if pollUp := m.GetPollUpdateMessage(); pollUp != nil {
 		messageType = "pollUpdateMessage"
 		updKey := &WookKey{}
