@@ -32,11 +32,12 @@ type WookMessageData struct {
 	PushName         string                  `json:"pushName,omitempty"`
 	Status           string                  `json:"status,omitempty"`
 	Message          *WookMessageRaw         `json:"message,omitempty"`
-	ContextInfo      *WookMessageContextInfo `json:"contextInfo,omitempty"`
+	ContextInfo      *WookMessageContextInfo  `json:"contextInfo,omitempty"`
 	MessageType      string                  `json:"messageType,omitempty"`
 	MessageTimestamp int                     `json:"messageTimestamp,omitempty"`
 	InstanceId       string                  `json:"instanceId,omitempty"`
 	Source           string                  `json:"source,omitempty"`
+	PollUpdates      []WookPollUpdate        `json:"pollUpdates,omitempty"`
 }
 
 type WookMessageContextInfo struct {

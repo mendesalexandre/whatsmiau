@@ -24,20 +24,21 @@ import (
 )
 
 type Whatsmiau struct {
-	clients             *xsync.Map[string, *whatsmeow.Client]
-	container           *sqlstore.Container
-	logger              waLog.Logger
-	repo                interfaces.InstanceRepository
-	qrCache             *xsync.Map[string, string]
-	pairingCache        *xsync.Map[string, string]
-	observerRunning     *xsync.Map[string, *whatsmeow.Client]
-	instanceCache       *xsync.Map[string, models.Instance]
-	lockConnection      *xsync.Map[string, *sync.Mutex]
-	connectPhoneNumber  *xsync.Map[string, string]
-	emitter          chan emitter
-	httpClient       *http.Client
-	fileStorage      interfaces.Storage
-	handlerSemaphore chan struct{}
+	clients            *xsync.Map[string, *whatsmeow.Client]
+	container          *sqlstore.Container
+	logger             waLog.Logger
+	repo               interfaces.InstanceRepository
+	qrCache            *xsync.Map[string, string]
+	pairingCache       *xsync.Map[string, string]
+	observerRunning    *xsync.Map[string, *whatsmeow.Client]
+	instanceCache      *xsync.Map[string, models.Instance]
+	lockConnection     *xsync.Map[string, *sync.Mutex]
+	connectPhoneNumber *xsync.Map[string, string]
+	emitter            chan emitter
+	httpClient         *http.Client
+	fileStorage        interfaces.Storage
+	handlerSemaphore   chan struct{}
+	pollCreationCache  *xsync.Map[string, pollCreationEntry]
 }
 
 var instance *Whatsmiau
@@ -141,6 +142,7 @@ func LoadMiau(ctx context.Context, container *sqlstore.Container) {
 		observerRunning:    xsync.NewMap[string, *whatsmeow.Client](),
 		lockConnection:     xsync.NewMap[string, *sync.Mutex](),
 		connectPhoneNumber: xsync.NewMap[string, string](),
+		pollCreationCache:  xsync.NewMap[string, pollCreationEntry](),
 		emitter:            make(chan emitter, env.Env.EmitterBufferSize),
 		httpClient: &http.Client{
 			Timeout: time.Second * 30, // TODO: load from env

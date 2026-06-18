@@ -2,6 +2,7 @@ package whatsmiau
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -979,8 +980,10 @@ func (s *Whatsmiau) parseWAMessage(m *waE2E.Message) (string, *WookMessageRaw, *
 		raw.PollUpdateMessage = &WookPollUpdateMessageRaw{
 			PollCreationMessageKey: updKey,
 			SenderTimestampMs:      i64(pollUp.GetSenderTimestampMS()),
-			EncPayload:             b64(pollUp.GetVote().GetEncPayload()),
-			EncIv:                  b64(pollUp.GetVote().GetEncIV()),
+			Vote: &WookPollVote{
+				EncPayload: b64(pollUp.GetVote().GetEncPayload()),
+				EncIv:      b64(pollUp.GetVote().GetEncIV()),
+			},
 		}
 	} else if ptv := m.GetPtvMessage(); ptv != nil {
 		messageType = "ptvMessage"
@@ -1140,6 +1143,21 @@ func (s *Whatsmiau) convertEventMessage(id string, instance *models.Instance, ev
 	// Convert the WA protobuf message into our internal raw structure
 	messageType, raw, ci := s.parseWAMessage(m)
 
+	// Store poll creation options for later vote decryption
+	if raw.PollCreationMessage != nil {
+		chatJid := e.Info.Chat.ToNonAD().String()
+		cacheKey := chatJid + ":" + e.Info.ID
+		entry := pollCreationEntry{
+			Options:   make([]pollOptionHash, len(raw.PollCreationMessage.Options)),
+			CreatedAt: time.Now(),
+		}
+		for i, opt := range raw.PollCreationMessage.Options {
+			hash := sha256.Sum256([]byte(opt.OptionName))
+			entry.Options[i] = pollOptionHash{Name: opt.OptionName, Hash: hash}
+		}
+		s.pollCreationCache.Store(cacheKey, entry)
+	}
+
 	// Upload media (URL / Base64) when needed
 	switch messageType {
 	case "imageMessage":
@@ -1216,6 +1234,52 @@ func (s *Whatsmiau) convertEventMessage(id string, instance *models.Instance, ev
 		}
 	}
 
+	// Decrypt poll vote and build pollUpdates
+	var pollUpdates []WookPollUpdate
+	if raw.PollUpdateMessage != nil && raw.PollUpdateMessage.PollCreationMessageKey != nil {
+		chatJid := e.Info.Chat.ToNonAD().String()
+		origMsgID := raw.PollUpdateMessage.PollCreationMessageKey.Id
+		cacheKey := chatJid + ":" + origMsgID
+
+		if decrypted, err := client.DecryptPollVote(ctx, evt); err == nil && decrypted != nil {
+			selectedHashes := decrypted.GetSelectedOptions()
+
+			if entry, ok := s.pollCreationCache.Load(cacheKey); ok {
+				// Expire entries older than 7 days
+				if time.Since(entry.CreatedAt) > 7*24*time.Hour {
+					s.pollCreationCache.Delete(cacheKey)
+					zap.L().Warn("poll creation entry expired from cache",
+						zap.String("cache_key", cacheKey),
+						zap.String("instance_id", id))
+				} else {
+					for _, selectedHash := range selectedHashes {
+						for _, opt := range entry.Options {
+							if bytes.Equal(selectedHash, opt.Hash[:]) {
+								raw.PollUpdateMessage.Vote.SelectedOptions = append(
+									raw.PollUpdateMessage.Vote.SelectedOptions,
+									opt.Name,
+								)
+								pollUpdates = append(pollUpdates, WookPollUpdate{
+									Name:   opt.Name,
+									Voters: []string{senderJid},
+								})
+								break
+							}
+						}
+					}
+				}
+			} else {
+				zap.L().Warn("poll creation entry not found in cache",
+					zap.String("cache_key", cacheKey),
+					zap.String("instance_id", id))
+			}
+		} else if err != nil {
+			zap.L().Error("failed to decrypt poll vote",
+				zap.Error(err),
+				zap.String("instance_id", id))
+		}
+	}
+
 	return &WookMessageData{
 		Key:              key,
 		PushName:         strings.TrimSpace(e.Info.PushName),
@@ -1226,6 +1290,7 @@ func (s *Whatsmiau) convertEventMessage(id string, instance *models.Instance, ev
 		MessageTimestamp: int(ts.Unix()),
 		InstanceId:       id,
 		Source:           "whatsapp",
+		PollUpdates:      pollUpdates,
 	}
 }
 

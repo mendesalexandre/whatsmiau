@@ -1,5 +1,7 @@
 package whatsmiau
 
+import "time"
+
 type WookStickerMessageRaw struct {
 	Url               string `json:"url,omitempty"`
 	FileSha256        string `json:"fileSha256,omitempty"`
@@ -46,11 +48,31 @@ type WookPollCreationMessageRaw struct {
 	SelectableOptionsCount uint32           `json:"selectableOptionsCount,omitempty"`
 }
 
+type WookPollVote struct {
+	EncPayload      string   `json:"encPayload,omitempty"`
+	EncIv           string   `json:"encIv,omitempty"`
+	SelectedOptions []string `json:"selectedOptions,omitempty"`
+}
+
 type WookPollUpdateMessageRaw struct {
-	PollCreationMessageKey *WookKey `json:"pollCreationMessageKey,omitempty"`
-	SenderTimestampMs      string   `json:"senderTimestampMs,omitempty"`
-	EncPayload             string   `json:"encPayload,omitempty"`
-	EncIv                  string   `json:"encIv,omitempty"`
+	PollCreationMessageKey *WookKey     `json:"pollCreationMessageKey,omitempty"`
+	Vote                   *WookPollVote `json:"vote,omitempty"`
+	SenderTimestampMs      string       `json:"senderTimestampMs,omitempty"`
+}
+
+type WookPollUpdate struct {
+	Name   string   `json:"name,omitempty"`
+	Voters []string `json:"voters,omitempty"`
+}
+
+type pollOptionHash struct {
+	Name string
+	Hash [32]byte
+}
+
+type pollCreationEntry struct {
+	Options   []pollOptionHash
+	CreatedAt time.Time
 }
 
 type WookPtvMessageRaw struct {
