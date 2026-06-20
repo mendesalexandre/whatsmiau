@@ -14,9 +14,11 @@ import (
 	"time"
 
 	"github.com/emersion/go-vcard"
+	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/verbeux-ai/whatsmiau/env"
 	"github.com/verbeux-ai/whatsmiau/models"
+	"github.com/verbeux-ai/whatsmiau/services"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/proto/waHistorySync"
@@ -1143,19 +1145,29 @@ func (s *Whatsmiau) convertEventMessage(id string, instance *models.Instance, ev
 	// Convert the WA protobuf message into our internal raw structure
 	messageType, raw, ci := s.parseWAMessage(m)
 
-	// Store poll creation options for later vote decryption
+	// Store poll creation options in Redis for later vote decryption
 	if raw.PollCreationMessage != nil {
 		chatJid := e.Info.Chat.ToNonAD().String()
-		cacheKey := chatJid + ":" + e.Info.ID
-		entry := pollCreationEntry{
-			Options:   make([]pollOptionHash, len(raw.PollCreationMessage.Options)),
+		cacheKey := "poll:cache:" + chatJid + ":" + e.Info.ID
+		entry := PollCreationEntry{
+			Options:   make([]PollOptionHash, len(raw.PollCreationMessage.Options)),
 			CreatedAt: time.Now(),
 		}
 		for i, opt := range raw.PollCreationMessage.Options {
 			hash := sha256.Sum256([]byte(opt.OptionName))
-			entry.Options[i] = pollOptionHash{Name: opt.OptionName, Hash: hash}
+			entry.Options[i] = PollOptionHash{Name: opt.OptionName, Hash: hash}
 		}
-		s.pollCreationCache.Store(cacheKey, entry)
+		if data, err := json.Marshal(entry); err == nil {
+			if err := services.Redis().Set(context.Background(), cacheKey, data, 7*24*time.Hour).Err(); err != nil {
+				zap.L().Error("failed to store poll creation in redis",
+					zap.Error(err),
+					zap.String("cache_key", cacheKey))
+			}
+		} else {
+			zap.L().Error("failed to marshal poll creation entry",
+				zap.Error(err),
+				zap.String("cache_key", cacheKey))
+		}
 	}
 
 	// Upload media (URL / Base64) when needed
@@ -1239,19 +1251,15 @@ func (s *Whatsmiau) convertEventMessage(id string, instance *models.Instance, ev
 	if raw.PollUpdateMessage != nil && raw.PollUpdateMessage.PollCreationMessageKey != nil {
 		chatJid := e.Info.Chat.ToNonAD().String()
 		origMsgID := raw.PollUpdateMessage.PollCreationMessageKey.Id
-		cacheKey := chatJid + ":" + origMsgID
+		cacheKey := "poll:cache:" + chatJid + ":" + origMsgID
 
 		if decrypted, err := client.DecryptPollVote(ctx, evt); err == nil && decrypted != nil {
 			selectedHashes := decrypted.GetSelectedOptions()
 
-			if entry, ok := s.pollCreationCache.Load(cacheKey); ok {
-				// Expire entries older than 7 days
-				if time.Since(entry.CreatedAt) > 7*24*time.Hour {
-					s.pollCreationCache.Delete(cacheKey)
-					zap.L().Warn("poll creation entry expired from cache",
-						zap.String("cache_key", cacheKey),
-						zap.String("instance_id", id))
-				} else {
+			data, err := services.Redis().Get(context.Background(), cacheKey).Bytes()
+			if err == nil {
+				var entry PollCreationEntry
+				if err := json.Unmarshal(data, &entry); err == nil {
 					for _, selectedHash := range selectedHashes {
 						for _, opt := range entry.Options {
 							if bytes.Equal(selectedHash, opt.Hash[:]) {
@@ -1267,9 +1275,19 @@ func (s *Whatsmiau) convertEventMessage(id string, instance *models.Instance, ev
 							}
 						}
 					}
+				} else {
+					zap.L().Error("failed to unmarshal poll creation entry",
+						zap.Error(err),
+						zap.String("cache_key", cacheKey),
+						zap.String("instance_id", id))
 				}
+			} else if err == redis.Nil {
+				zap.L().Warn("poll creation entry not found in redis",
+					zap.String("cache_key", cacheKey),
+					zap.String("instance_id", id))
 			} else {
-				zap.L().Warn("poll creation entry not found in cache",
+				zap.L().Error("failed to get poll creation from redis",
+					zap.Error(err),
 					zap.String("cache_key", cacheKey),
 					zap.String("instance_id", id))
 			}

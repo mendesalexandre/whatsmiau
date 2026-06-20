@@ -38,7 +38,6 @@ type Whatsmiau struct {
 	httpClient         *http.Client
 	fileStorage        interfaces.Storage
 	handlerSemaphore   chan struct{}
-	pollCreationCache  *xsync.Map[string, pollCreationEntry]
 }
 
 var instance *Whatsmiau
@@ -142,7 +141,6 @@ func LoadMiau(ctx context.Context, container *sqlstore.Container) {
 		observerRunning:    xsync.NewMap[string, *whatsmeow.Client](),
 		lockConnection:     xsync.NewMap[string, *sync.Mutex](),
 		connectPhoneNumber: xsync.NewMap[string, string](),
-		pollCreationCache:  xsync.NewMap[string, pollCreationEntry](),
 		emitter:            make(chan emitter, env.Env.EmitterBufferSize),
 		httpClient: &http.Client{
 			Timeout: time.Second * 30, // TODO: load from env

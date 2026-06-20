@@ -65,14 +65,14 @@ type WookPollUpdate struct {
 	Voters []string `json:"voters,omitempty"`
 }
 
-type pollOptionHash struct {
-	Name string
-	Hash [32]byte
+type PollOptionHash struct {
+	Name string   `json:"name"`
+	Hash [32]byte `json:"hash"`
 }
 
-type pollCreationEntry struct {
-	Options   []pollOptionHash
-	CreatedAt time.Time
+type PollCreationEntry struct {
+	Options   []PollOptionHash `json:"options"`
+	CreatedAt time.Time        `json:"createdAt"`
 }
 
 type WookPtvMessageRaw struct {
