@@ -168,47 +168,10 @@ func (s *Whatsmiau) SendSticker(ctx context.Context, data *SendStickerRequest) (
 	return &SendStickerResponse{ID: res.ID, CreatedAt: res.Timestamp}, nil
 }
 
-// --- SendLocation ---
-
-type SendLocationRequest struct {
-	InstanceID string     `json:"instance_id"`
-	RemoteJID  *types.JID `json:"remote_jid"`
-	Latitude   float64    `json:"latitude"`
-	Longitude  float64    `json:"longitude"`
-	Name       string     `json:"name"`
-	Address    string     `json:"address"`
-}
-
-type SendLocationResponse struct {
-	ID        string    `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-func (s *Whatsmiau) SendLocation(ctx context.Context, data *SendLocationRequest) (*SendLocationResponse, error) {
-	client, resolved, err := s.loadClientWithJID(ctx, data.InstanceID, data.RemoteJID)
-	if err != nil {
-		return nil, err
-	}
-	data.RemoteJID = &resolved
-
-	loc := &waE2E.LocationMessage{
-		DegreesLatitude:  proto.Float64(data.Latitude),
-		DegreesLongitude: proto.Float64(data.Longitude),
-	}
-	if data.Name != "" {
-		loc.Name = proto.String(data.Name)
-	}
-	if data.Address != "" {
-		loc.Address = proto.String(data.Address)
-	}
-
-	res, err := client.SendMessage(ctx, resolved, &waE2E.Message{LocationMessage: loc})
-	if err != nil {
-		return nil, err
-	}
-
-	return &SendLocationResponse{ID: res.ID, CreatedAt: res.Timestamp}, nil
-}
+// SendLocation já existe em send.go (implementação anterior ao upstream
+// "all-message-types" — mantida como está, ext_id/status_entrega já validados
+// em produção). O upstream duplicou esse tipo/handler nessa PR; removido aqui
+// para não colidir com a declaração original.
 
 // --- SendContact ---
 

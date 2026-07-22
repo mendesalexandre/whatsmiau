@@ -45,28 +45,9 @@ type SendStickerResponse struct {
 	InstanceId       string             `json:"instanceId"`
 }
 
-// --- sendLocation ---
-
-type SendLocationRequest struct {
-	InstanceID       string                `param:"instance" swaggerignore:"true"`
-	Number           string                `json:"number,omitempty" validate:"required"`
-	Latitude         float64               `json:"latitude,omitempty" validate:"required"`
-	Longitude        float64               `json:"longitude,omitempty" validate:"required"`
-	Name             string                `json:"name,omitempty"`
-	Address          string                `json:"address,omitempty"`
-	Delay            int                   `json:"delay,omitempty" validate:"omitempty,min=0,max=300000"`
-	Quoted           *MessageRequestQuoted `json:"quoted,omitempty"`
-	MentionsEveryOne bool                  `json:"mentionsEveryOne,omitempty"`
-	Mentioned        []string              `json:"mentioned,omitempty"`
-}
-
-type SendLocationResponse struct {
-	Key              MessageResponseKey `json:"key"`
-	Status           string             `json:"status"`
-	MessageType      string             `json:"messageType"`
-	MessageTimestamp int                `json:"messageTimestamp"`
-	InstanceId       string             `json:"instanceId"`
-}
+// sendLocation já existe em message.go (implementação anterior ao upstream
+// "all-message-types") — mantida como está pra não quebrar o contrato que o
+// CartZap já usa em produção. Duplicata do upstream removida daqui.
 
 // --- sendContact ---
 

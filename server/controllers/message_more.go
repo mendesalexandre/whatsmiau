@@ -70,7 +70,7 @@ func (s *Message) sendVideo(ctx echo.Context, request dto.SendDocumentRequest, g
 		},
 		Status:           "sent",
 		MessageType:      "videoMessage",
-		MessageTimestamp: int(res.CreatedAt.Unix() / 1000),
+		MessageTimestamp: res.CreatedAt.Unix() / 1000,
 		InstanceId:       request.InstanceID,
 	})
 }
@@ -189,61 +189,8 @@ func (s *Message) SendSticker(ctx echo.Context) error {
 	})
 }
 
-// SendLocation godoc
-// @Summary      Send a location message
-// @Description  Sends a geographic location to a WhatsApp number
-// @Tags         Message
-// @Accept       json
-// @Produce      json
-// @Security     ApiKeyAuth
-// @Param        instance  path      string                  true  "Instance ID"
-// @Param        body      body      dto.SendLocationRequest  true  "Location parameters"
-// @Success      200       {object}  dto.SendLocationResponse
-// @Router       /message/sendLocation/{instance} [post]
-func (s *Message) SendLocation(ctx echo.Context) error {
-	var request dto.SendLocationRequest
-	if err := ctx.Bind(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
-	}
-
-	if err := validator.New().Struct(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
-	}
-
-	jid, err := numberToJid(request.Number)
-	if err != nil {
-		zap.L().Error("error converting number to jid", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid number format")
-	}
-
-	c := ctx.Request().Context()
-	time.Sleep(time.Millisecond * time.Duration(request.Delay))
-
-	res, err := s.whatsmiau.SendLocation(c, &whatsmiau.SendLocationRequest{
-		InstanceID: request.InstanceID,
-		RemoteJID:  jid,
-		Latitude:   request.Latitude,
-		Longitude:  request.Longitude,
-		Name:       request.Name,
-		Address:    request.Address,
-	})
-	if err != nil {
-		zap.L().Error("Whatsmiau.SendLocation failed", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to send location")
-	}
-
-	return ctx.JSON(http.StatusOK, dto.SendLocationResponse{
-		Key: dto.MessageResponseKey{
-			RemoteJid: request.Number,
-			FromMe:    true,
-			Id:        res.ID,
-		},
-		Status:           "sent",
-		MessageType:      "locationMessage",
-		MessageTimestamp: int(res.CreatedAt.Unix() / 1000),
-		InstanceId:       request.InstanceID,
-	})
-}
+// SendLocation já existe em message.go (implementação anterior ao upstream
+// "all-message-types") — duplicata do upstream removida daqui.
 
 // SendContact godoc
 // @Summary      Send one or more contacts
