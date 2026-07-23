@@ -14,6 +14,7 @@ const (
 	WookContactsUpsert   Wook = "contacts.upsert"
 	WookConnectionUpdate Wook = "connection.update"
 	WookMessagesDelete   Wook = "messages.delete"
+	WookMessagesEdit     Wook = "messages.edit"
 )
 
 type WookEvent[data any] struct {
@@ -261,6 +262,19 @@ type WookMessageDeleteData struct {
 	FromMe      bool   `json:"fromMe"`
 	Participant string `json:"participant,omitempty"`
 	Status      string `json:"status,omitempty"`
+	InstanceId  string `json:"instanceId,omitempty"`
+}
+
+// WookMessageEditData carrega o novo texto de uma mensagem editada pelo
+// remetente original (fromMe=false quando é o cliente editando a própria
+// mensagem que ele mandou). Id é o mensagem_externa_id da mensagem original,
+// não da mensagem de controle que carrega a edição.
+type WookMessageEditData struct {
+	Id          string `json:"id,omitempty"`
+	RemoteJid   string `json:"remoteJid,omitempty"`
+	FromMe      bool   `json:"fromMe"`
+	Participant string `json:"participant,omitempty"`
+	NewMessage  string `json:"newMessage,omitempty"`
 	InstanceId  string `json:"instanceId,omitempty"`
 }
 
