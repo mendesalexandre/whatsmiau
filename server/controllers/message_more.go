@@ -51,6 +51,7 @@ func (s *Message) sendVideo(ctx echo.Context, request dto.SendDocumentRequest, g
 		RemoteJID:   jid,
 		Mimetype:    request.Mimetype,
 		GifPlayback: gif,
+		ViewOnce:    request.ViewOnce,
 	}
 
 	c := ctx.Request().Context()

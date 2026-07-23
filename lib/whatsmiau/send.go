@@ -137,6 +137,7 @@ type SendAudioRequest struct {
 	QuoteMessageID string     `json:"quote_message_id"`
 	QuoteMessage   string     `json:"quote_message"`
 	Participant    *types.JID `json:"participant"`
+	ViewOnce       bool       `json:"view_once"`
 }
 
 type SendAudioResponse struct {
@@ -180,6 +181,9 @@ func (s *Whatsmiau) SendAudio(ctx context.Context, data *SendAudioRequest) (*Sen
 		FileEncSHA256: uploaded.FileEncSHA256,
 		DirectPath:    proto.String(uploaded.DirectPath),
 		Waveform:      waveForm,
+	}
+	if data.ViewOnce {
+		audio.ViewOnce = proto.Bool(true)
 	}
 
 	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
@@ -266,6 +270,7 @@ type SendImageRequest struct {
 	Caption    string     `json:"caption"`
 	RemoteJID  *types.JID `json:"remote_jid"`
 	Mimetype   string     `json:"mimetype"`
+	ViewOnce   bool       `json:"view_once"`
 }
 type SendImageResponse struct {
 	ID        string    `json:"id"`
@@ -305,6 +310,9 @@ func (s *Whatsmiau) SendImage(ctx context.Context, data *SendImageRequest) (*Sen
 		MediaKey:      uploaded.MediaKey,
 		FileEncSHA256: uploaded.FileEncSHA256,
 		DirectPath:    proto.String(uploaded.DirectPath),
+	}
+	if data.ViewOnce {
+		doc.ViewOnce = proto.Bool(true)
 	}
 
 	resolved := s.resolveJID(ctx, client, *data.RemoteJID)

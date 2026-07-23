@@ -764,6 +764,23 @@ func (s *Whatsmiau) parseWAMessage(m *waE2E.Message) (string, *WookMessageRaw, *
 	raw := &WookMessageRaw{}
 	var ci *waE2E.ContextInfo
 
+	// View-once pode chegar de duas formas: flag direta em Image/Audio/Video
+	// (tratada abaixo, em cada branch) ou envelopada num wrapper
+	// (viewOnceMessage/V2/V2Extension), usado por clientes mais novos —
+	// principalmente vídeo. Sem desembrulhar aqui, o conteúdo real fica
+	// escondido um nível a mais e a mensagem inteira cai em "unknown".
+	isViewOnce := false
+	if vo := m.GetViewOnceMessage(); vo != nil && vo.GetMessage() != nil {
+		m = vo.GetMessage()
+		isViewOnce = true
+	} else if vo2 := m.GetViewOnceMessageV2(); vo2 != nil && vo2.GetMessage() != nil {
+		m = vo2.GetMessage()
+		isViewOnce = true
+	} else if vo2e := m.GetViewOnceMessageV2Extension(); vo2e != nil && vo2e.GetMessage() != nil {
+		m = vo2e.GetMessage()
+		isViewOnce = true
+	}
+
 	// === Prioritize action-like messages ===
 	if r := m.GetReactionMessage(); r != nil {
 		messageType = "reactionMessage"
@@ -863,6 +880,7 @@ func (s *Whatsmiau) parseWAMessage(m *waE2E.Message) (string, *WookMessageRaw, *
 			FileEncSha256: b64(video.GetFileEncSHA256()),
 			JPEGThumbnail: b64(video.GetJPEGThumbnail()),
 			GIFPlayback:   video.GetGifPlayback(),
+			ViewOnce:      video.GetViewOnce(),
 		}
 		ci = video.GetContextInfo()
 	} else if contact := m.GetContactMessage(); contact != nil {
@@ -1010,6 +1028,21 @@ func (s *Whatsmiau) parseWAMessage(m *waE2E.Message) (string, *WookMessageRaw, *
 		ci = et.GetContextInfo()
 	} else {
 		messageType = "unknown"
+	}
+
+	// O wrapper viewOnceMessage/V2/V2Extension não carrega a flag ViewOnce
+	// dentro do sub-tipo (Image/Audio/Video) — a intenção "única" está só
+	// no fato de estar envelopada. Propaga pro raw pra chegar no webhook.
+	if isViewOnce {
+		if raw.ImageMessage != nil {
+			raw.ImageMessage.ViewOnce = true
+		}
+		if raw.AudioMessage != nil {
+			raw.AudioMessage.ViewOnce = true
+		}
+		if raw.VideoMessage != nil {
+			raw.VideoMessage.ViewOnce = true
+		}
 	}
 
 	return messageType, raw, ci

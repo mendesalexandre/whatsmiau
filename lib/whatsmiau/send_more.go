@@ -21,6 +21,7 @@ type SendVideoRequest struct {
 	RemoteJID   *types.JID `json:"remote_jid"`
 	Mimetype    string     `json:"mimetype"`
 	GifPlayback bool       `json:"gif_playback"`
+	ViewOnce    bool       `json:"view_once"`
 }
 
 type SendVideoResponse struct {
@@ -61,6 +62,9 @@ func (s *Whatsmiau) SendVideo(ctx context.Context, data *SendVideoRequest) (*Sen
 	}
 	if data.GifPlayback {
 		video.GifPlayback = proto.Bool(true)
+	}
+	if data.ViewOnce {
+		video.ViewOnce = proto.Bool(true)
 	}
 
 	res, err := client.SendMessage(ctx, resolved, &waE2E.Message{VideoMessage: &video})

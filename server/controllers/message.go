@@ -201,6 +201,7 @@ func (s *Message) SendAudio(ctx echo.Context) error {
 		AudioURL:   request.Audio,
 		InstanceID: request.InstanceID,
 		RemoteJID:  jid,
+		ViewOnce:   request.ViewOnce,
 	}
 
 	if request.Quoted != nil && len(request.Quoted.Key.Id) > 0 && len(request.Quoted.Message.Conversation) > 0 {
@@ -379,6 +380,7 @@ func (s *Message) sendImage(ctx echo.Context, request dto.SendDocumentRequest) e
 		Caption:    request.Caption,
 		RemoteJID:  jid,
 		Mimetype:   request.Mimetype,
+		ViewOnce:   request.ViewOnce,
 	}
 
 	c := ctx.Request().Context()

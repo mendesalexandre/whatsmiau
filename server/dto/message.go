@@ -84,6 +84,7 @@ type SendAudioRequest struct {
 	MentionsEveryOne bool                  `json:"mentionsEveryOne,omitempty"`
 	Mentioned        []string              `json:"mentioned,omitempty"`
 	Encoding         bool                  `json:"encoding,omitempty"`
+	ViewOnce         bool                  `json:"viewOnce,omitempty"`
 }
 
 type SendAudioResponseMessage struct {
@@ -157,6 +158,7 @@ type SendDocumentRequest struct {
 	Quoted           *MessageRequestQuoted `json:"quoted,omitempty"`
 	MentionsEveryOne bool                  `json:"mentionsEveryOne,omitempty"`
 	Mentioned        []string              `json:"mentioned,omitempty"`
+	ViewOnce         bool                  `json:"viewOnce,omitempty"`
 }
 
 type SendDocumentResponse struct {

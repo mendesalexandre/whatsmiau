@@ -219,6 +219,7 @@ type WookVideoMessageRaw struct {
 	FileEncSha256 string `json:"fileEncSha256,omitempty"`
 	JPEGThumbnail string `json:"jpegThumbnail,omitempty"`
 	GIFPlayback   bool   `json:"gifPlayback,omitempty"`
+	ViewOnce      bool   `json:"viewOnce,omitempty"`
 }
 
 type WookImageMessageRaw struct {
