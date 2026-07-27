@@ -940,17 +940,19 @@ func (s *Whatsmiau) parseWAMessage(m *waE2E.Message) (string, *WookMessageRaw, *
 	} else if video := m.GetVideoMessage(); video != nil {
 		messageType = "videoMessage"
 		raw.VideoMessage = &WookVideoMessageRaw{
-			Url:           video.GetURL(),
-			Mimetype:      video.GetMimetype(),
-			Caption:       video.GetCaption(),
-			FileSha256:    b64(video.GetFileSHA256()),
-			FileLength:    u64(video.GetFileLength()),
-			Seconds:       video.GetSeconds(),
-			MediaKey:      b64(video.GetMediaKey()),
-			FileEncSha256: b64(video.GetFileEncSHA256()),
-			JPEGThumbnail: b64(video.GetJPEGThumbnail()),
-			GIFPlayback:   video.GetGifPlayback(),
-			ViewOnce:      video.GetViewOnce(),
+			Url:               video.GetURL(),
+			Mimetype:          video.GetMimetype(),
+			Caption:           video.GetCaption(),
+			FileSha256:        b64(video.GetFileSHA256()),
+			FileLength:        u64(video.GetFileLength()),
+			Seconds:           video.GetSeconds(),
+			MediaKey:          b64(video.GetMediaKey()),
+			FileEncSha256:     b64(video.GetFileEncSHA256()),
+			DirectPath:        video.GetDirectPath(),
+			MediaKeyTimestamp: i64(video.GetMediaKeyTimestamp()),
+			JPEGThumbnail:     b64(video.GetJPEGThumbnail()),
+			GIFPlayback:       video.GetGifPlayback(),
+			ViewOnce:          video.GetViewOnce(),
 		}
 		ci = video.GetContextInfo()
 	} else if contact := m.GetContactMessage(); contact != nil {

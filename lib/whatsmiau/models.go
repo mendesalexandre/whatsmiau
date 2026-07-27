@@ -210,17 +210,19 @@ type WookDocumentMessageRaw struct {
 }
 
 type WookVideoMessageRaw struct {
-	Url           string `json:"url,omitempty"`
-	Mimetype      string `json:"mimetype,omitempty"`
-	Caption       string `json:"caption,omitempty"`
-	FileSha256    string `json:"fileSha256,omitempty"`
-	FileLength    string `json:"fileLength,omitempty"`
-	Seconds       uint32 `json:"seconds,omitempty"`
-	MediaKey      string `json:"mediaKey,omitempty"`
-	FileEncSha256 string `json:"fileEncSha256,omitempty"`
-	JPEGThumbnail string `json:"jpegThumbnail,omitempty"`
-	GIFPlayback   bool   `json:"gifPlayback,omitempty"`
-	ViewOnce      bool   `json:"viewOnce,omitempty"`
+	Url               string `json:"url,omitempty"`
+	Mimetype          string `json:"mimetype,omitempty"`
+	Caption           string `json:"caption,omitempty"`
+	FileSha256        string `json:"fileSha256,omitempty"`
+	FileLength        string `json:"fileLength,omitempty"`
+	Seconds           uint32 `json:"seconds,omitempty"`
+	MediaKey          string `json:"mediaKey,omitempty"`
+	FileEncSha256     string `json:"fileEncSha256,omitempty"`
+	DirectPath        string `json:"directPath,omitempty"`
+	MediaKeyTimestamp string `json:"mediaKeyTimestamp,omitempty"`
+	JPEGThumbnail     string `json:"jpegThumbnail,omitempty"`
+	GIFPlayback       bool   `json:"gifPlayback,omitempty"`
+	ViewOnce          bool   `json:"viewOnce,omitempty"`
 }
 
 type WookImageMessageRaw struct {
