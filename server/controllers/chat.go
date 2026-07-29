@@ -292,6 +292,60 @@ func (s *Chat) FetchProfilePictureUrl(ctx echo.Context) error {
 	})
 }
 
+// FetchProfile godoc
+// @Summary      Fetch WhatsApp profile display name
+// @Description  Returns the display name (full name, push name, business name) for a given number, read from the local contact store. Evolution API compatible.
+// @Tags         Chat
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string                      true  "Instance ID"
+// @Param        body      body      dto.FetchProfileRequest      true  "Number to look up"
+// @Success      200       {object}  dto.FetchProfileResponse
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      404       {object}  utils.HTTPErrorResponse
+// @Failure      422       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /chat/fetchProfile/{instance} [post]
+func (s *Chat) FetchProfile(ctx echo.Context) error {
+	instanceID := ctx.Param("instance")
+	if instanceID == "" {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, nil, "instance ID is required in the URL path")
+	}
+
+	var request dto.FetchProfileRequest
+	if err := ctx.Bind(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+	}
+
+	if err := validator.New().Struct(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+	}
+
+	response, err := s.whatsmiau.FetchProfile(ctx.Request().Context(), &whatsmiau.FetchProfileRequest{
+		InstanceID: instanceID,
+		Number:     request.Number,
+	})
+	if err != nil {
+		if errors.Is(err, whatsmeow.ErrClientIsNil) {
+			return utils.HTTPFail(ctx, http.StatusNotFound, err, "instance not found or not connected")
+		}
+		if errors.Is(err, whatsmiau.ErrEmptyNumber) {
+			return utils.HTTPFail(ctx, http.StatusBadRequest, err, "number is empty")
+		}
+		zap.L().Error("Whatsmiau.FetchProfile failed", zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to fetch profile")
+	}
+
+	return ctx.JSON(http.StatusOK, dto.FetchProfileResponse{
+		Wuid:         response.Wuid,
+		Name:         response.Name,
+		PushName:     response.PushName,
+		BusinessName: response.BusinessName,
+		IsBusiness:   response.IsBusiness,
+	})
+}
+
 // DeleteMessageForEveryone godoc
 // @Summary      Revoke a sent message for everyone
 // @Description  Deletes a previously sent message from WhatsApp ("apagar pra todos"). Only works on

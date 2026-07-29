@@ -162,6 +162,82 @@ func (s *Whatsmiau) FetchProfilePictureUrl(ctx context.Context, data *FetchProfi
 	return resp, nil
 }
 
+type FetchProfileRequest struct {
+	InstanceID string `json:"instance_id"`
+	Number     string `json:"number"`
+}
+
+type FetchProfileResponse struct {
+	Wuid         string `json:"wuid"`
+	Name         string `json:"name"`
+	PushName     string `json:"pushName"`
+	BusinessName string `json:"businessName"`
+	IsBusiness   bool   `json:"isBusiness"`
+}
+
+// FetchProfile resolves a raw phone number to a WhatsApp JID and returns
+// display-name info from the LOCAL contact store (populated passively by
+// history sync / app-state sync — no extra network round-trip, no rate
+// limit risk). Mirrors Evolution API's POST /chat/fetchProfile/{instance}.
+// Used to backfill contact names after bulk history import, since WhatsApp's
+// per-message history payload often omits pushName for old messages.
+func (s *Whatsmiau) FetchProfile(ctx context.Context, data *FetchProfileRequest) (*FetchProfileResponse, error) {
+	client, ok := s.clients.Load(data.InstanceID)
+	if !ok {
+		return nil, whatsmeow.ErrClientIsNil
+	}
+
+	number := strings.TrimSpace(data.Number)
+	if number == "" {
+		return nil, ErrEmptyNumber
+	}
+
+	var jid types.JID
+	if strings.Contains(number, "@") {
+		parsed, err := types.ParseJID(number)
+		if err != nil {
+			return nil, err
+		}
+		jid = parsed
+	} else {
+		digits := strings.Map(func(r rune) rune {
+			if r >= '0' && r <= '9' {
+				return r
+			}
+			return -1
+		}, number)
+		if digits == "" {
+			return nil, ErrEmptyNumber
+		}
+		jid = types.NewJID(digits, types.DefaultUserServer)
+		jid = s.resolveJID(ctx, client, jid)
+	}
+
+	contact, err := client.Store.Contacts.GetContact(ctx, jid)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &FetchProfileResponse{
+		Wuid:         jid.String(),
+		PushName:     contact.PushName,
+		BusinessName: contact.BusinessName,
+		IsBusiness:   contact.BusinessName != "",
+	}
+	switch {
+	case contact.FullName != "":
+		resp.Name = contact.FullName
+	case contact.FirstName != "":
+		resp.Name = contact.FirstName
+	case contact.BusinessName != "":
+		resp.Name = contact.BusinessName
+	default:
+		resp.Name = contact.PushName
+	}
+
+	return resp, nil
+}
+
 // RevokeMessageRequest — apaga uma mensagem pra todos no WhatsApp ("revoke").
 // Funciona apenas em mensagens enviadas pelo próprio cliente e dentro da
 // janela de ~2 dias do WhatsApp. Quem decide se está dentro da janela é o

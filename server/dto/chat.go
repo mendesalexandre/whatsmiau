@@ -54,6 +54,22 @@ type FetchProfilePictureUrlResponse struct {
 	ProfilePictureURL string `json:"profilePictureUrl"`
 }
 
+// FetchProfileRequest mirrors the Evolution API v2 payload for
+// POST /chat/fetchProfile/{instance}.
+type FetchProfileRequest struct {
+	Number string `json:"number" validate:"required"`
+}
+
+// FetchProfileResponse mirrors Evolution's response shape so the same
+// client code works unchanged against both backends.
+type FetchProfileResponse struct {
+	Wuid         string `json:"wuid"`
+	Name         string `json:"name"`
+	PushName     string `json:"pushName"`
+	BusinessName string `json:"businessName"`
+	IsBusiness   bool   `json:"isBusiness"`
+}
+
 // DeleteMessageForEveryoneRequest — payload pra apagar (revoke) uma mensagem
 // no WhatsApp pra todos os participantes. Aceita o formato Evolution API:
 // { key: { remoteJid, fromMe, id } }.
