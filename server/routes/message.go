@@ -25,6 +25,7 @@ func Message(group *echo.Group) {
 	group.POST("/list", controller.SendList)
 	group.POST("/buttons", controller.SendButtons)
 	group.POST("/interactive-copy-code", controller.SendInteractiveCopyCode)
+	group.POST("/history-sync", controller.RequestHistorySync)
 }
 
 func MessageEVO(group *echo.Group) {

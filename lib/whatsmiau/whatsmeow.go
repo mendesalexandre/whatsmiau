@@ -38,6 +38,7 @@ type Whatsmiau struct {
 	httpClient         *http.Client
 	fileStorage        interfaces.Storage
 	handlerSemaphore   chan struct{}
+	webhookErrors      *webhookErrorBuffer
 }
 
 var instance *Whatsmiau
@@ -147,6 +148,7 @@ func LoadMiau(ctx context.Context, container *sqlstore.Container) {
 		},
 		fileStorage:      storage,
 		handlerSemaphore: make(chan struct{}, env.Env.HandlerSemaphoreSize),
+		webhookErrors:    newWebhookErrorBuffer(20),
 	}
 
 	go instance.startEmitter()

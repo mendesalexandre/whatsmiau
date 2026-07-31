@@ -783,3 +783,46 @@ func (s *Message) SendInteractiveCopyCode(ctx echo.Context) error {
 		InstanceId:       request.InstanceID,
 	})
 }
+
+// RequestHistorySync godoc
+// @Summary      Request on-demand history sync for a chat
+// @Description  Asks the primary device to push older messages of a specific chat, anchored at a known message
+// @Tags         Message
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance path string true "Instance ID"
+// @Param        request body dto.RequestHistorySyncRequest true "Request payload"
+// @Router       /instance/{instance}/message/history-sync [post]
+func (s *Message) RequestHistorySync(ctx echo.Context) error {
+	var request dto.RequestHistorySyncRequest
+	if err := ctx.Bind(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+	}
+
+	if err := validator.New().Struct(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+	}
+
+	chatJID, err := types.ParseJID(request.ChatJID)
+	if err != nil {
+		zap.L().Error("error parsing chat jid", zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid chatJid format")
+	}
+
+	c := ctx.Request().Context()
+	res, err := s.whatsmiau.RequestHistorySync(c, &whatsmiau.RequestHistorySyncData{
+		InstanceID:         request.InstanceID,
+		ChatJID:            &chatJID,
+		OldestMsgID:        request.OldestMsgID,
+		OldestMsgFromMe:    request.OldestMsgFromMe,
+		OldestMsgTimestamp: request.OldestMsgTimestamp,
+		Count:              request.Count,
+	})
+	if err != nil {
+		zap.L().Error("Whatsmiau.RequestHistorySync", zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to request history sync")
+	}
+
+	return ctx.JSON(http.StatusOK, res)
+}

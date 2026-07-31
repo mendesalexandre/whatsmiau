@@ -89,3 +89,16 @@ func (s *Webhook) Find(ctx echo.Context) error {
 		Webhook: &result[0].Webhook,
 	})
 }
+
+func (s *Webhook) Errors(ctx echo.Context) error {
+	var request dto.FindWebhookRequest
+	if err := ctx.Bind(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+	}
+
+	if err := s.validate.Struct(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+	}
+
+	return ctx.JSON(http.StatusOK, s.whatsmiau.WebhookErrors(request.InstanceID))
+}

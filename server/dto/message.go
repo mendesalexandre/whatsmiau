@@ -310,3 +310,12 @@ type SendInteractiveCopyCodeResponse struct {
 	MessageTimestamp int64              `json:"messageTimestamp"`
 	InstanceId       string             `json:"instanceId"`
 }
+
+type RequestHistorySyncRequest struct {
+	InstanceID         string `param:"instance" validate:"required" swaggerignore:"true"`
+	ChatJID            string `json:"chatJid" validate:"required"`
+	OldestMsgID        string `json:"oldestMsgId" validate:"required"`
+	OldestMsgFromMe    bool   `json:"oldestMsgFromMe"`
+	OldestMsgTimestamp int64  `json:"oldestMsgTimestamp" validate:"required"`
+	Count              int    `json:"count" validate:"required,min=1,max=100"`
+}

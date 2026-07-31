@@ -14,4 +14,5 @@ func Webhook(group *echo.Group) {
 
 	group.POST("/set/:instance", controller.Set)
 	group.GET("/find/:instance", controller.Find)
+	group.GET("/errors/:instance", controller.Errors)
 }
