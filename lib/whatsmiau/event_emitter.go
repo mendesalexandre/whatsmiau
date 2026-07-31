@@ -318,7 +318,17 @@ func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *
 	// Fired in a goroutine so we never block the webhook emission below; the
 	// receipt is best-effort and a failure shouldn't delay or break the
 	// webhook flow.
-	if instance.ReadMessages && !e.Info.IsFromMe && e.Info.ID != "" {
+	//
+	// Self-chat exception: IsFromMe is true for self-sent messages too (WhatsApp
+	// echoes them back to all of your own linked devices), so the plain
+	// !IsFromMe guard above incorrectly also skips the one legitimate case
+	// where we ARE also the recipient — self-chat ("message yourself") never
+	// got its read receipt, staying stuck at 1 check even though nothing was
+	// actually wrong. isSelfChat narrows the exception to exactly that case;
+	// every other IsFromMe message (sent to a real customer) still correctly
+	// skips the ack.
+	isSelf := e.Info.IsFromMe && s.isSelfChat(id, e.Info.Chat)
+	if instance.ReadMessages && e.Info.ID != "" && (!e.Info.IsFromMe || isSelf) {
 		go s.markIncomingAsRead(id, e)
 	}
 
@@ -461,6 +471,18 @@ func (s *Whatsmiau) handleMessageEditEvent(id string, instance *models.Instance,
 
 	zap.L().Debug("message edit event", zap.String("instance", id), zap.Any("data", editData))
 	s.emit(wookEvent, instance.Webhook.Url, instance.Webhook.Headers, instance.ID, string(wookEvent.Event))
+}
+
+// isSelfChat reports whether the given chat JID is the instance's own
+// account (the "message yourself" thread). Compares the non-AD (device-
+// agnostic) form so it matches regardless of which of the account's own
+// devices sent/received the echo.
+func (s *Whatsmiau) isSelfChat(instanceID string, chat types.JID) bool {
+	client, ok := s.clients.Load(instanceID)
+	if !ok || client.Store.ID == nil {
+		return false
+	}
+	return chat.ToNonAD() == client.Store.ID.ToNonAD()
 }
 
 // markIncomingAsRead sends a read receipt for a single inbound message. Used
