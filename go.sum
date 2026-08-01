@@ -154,6 +154,8 @@ github.com/mattn/go-sqlite3 v1.14.48 h1:7XHIgl0a8HwOaiK4E47ozLkST78rR9+OtNGx27D/
 github.com/mattn/go-sqlite3 v1.14.48/go.mod h1:6JTjA44L93a0QCyJef5YvlPoKXntQPjzWv5gtm9sB6w=
 github.com/mendesalexandre/whatsmeow v1.3.1-0.20260801000754-88c8aede4ed3 h1:BM8HS+A5gfSr8y49s/1e5mrPHJAPad7+6OWSaQKCL/I=
 github.com/mendesalexandre/whatsmeow v1.3.1-0.20260801000754-88c8aede4ed3/go.mod h1:EklsRqbr16Wp1fGKJMN7m0YUDpGqYt53UQ/+/1dP8yo=
+github.com/mendesalexandre/whatsmeow v1.3.1-0.20260801003904-d469aeafb4fd h1:T1788MhrdIhUDonPz1oMLet4G2ma63YVtlavjZ5C3PU=
+github.com/mendesalexandre/whatsmeow v1.3.1-0.20260801003904-d469aeafb4fd/go.mod h1:EklsRqbr16Wp1fGKJMN7m0YUDpGqYt53UQ/+/1dP8yo=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
 github.com/nxadm/tail v1.4.8/go.mod h1:+ncqLTQzXmGhMZNUePPaPqPvBxHAIsmXswZKocGu+AU=

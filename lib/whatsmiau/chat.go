@@ -334,6 +334,20 @@ func (s *Whatsmiau) resolveJID(ctx context.Context, client *whatsmeow.Client, ji
 
 	for _, item := range resp {
 		if item.IsIn {
+			// item.JID pode vir endereçado por LID (contas migradas) em vez
+			// de número de telefone. Essa função só existe pra desambiguar
+			// o 9º dígito móvel BR — reaproveitar item.JID.User sem checar
+			// o Server monta um JID hibrido inválido (User de LID + Server
+			// de telefone, ex: "169651241775355@s.whatsapp.net"), que não
+			// bate com nenhum contato real e quebra o envio (server error
+			// 463). Só aceita a resolução quando o servidor devolveu de
+			// fato um JID de telefone; caso contrário mantém o original e
+			// deixa a resolução de LID (mais abaixo, em SendMessage) cuidar
+			// do endereçamento correto.
+			if item.JID.Server != types.DefaultUserServer {
+				zap.L().Debug("resolveJID: ignorando resolucao nao-telefone", zap.String("number", jid.User), zap.Stringer("item_jid", item.JID))
+				continue
+			}
 			resolved := jid
 			resolved.User = item.JID.User
 			if resolved.User != jid.User {
