@@ -883,6 +883,84 @@ func (s *Whatsmiau) emitConnectionUpdate(id string, state string, statusReason i
 	s.handleConnectionUpdateEvent(id, instance, state, statusReason, eventMap)
 }
 
+// nativeFlowButtonParams is the shape of NativeFlowButton.ButtonParamsJSON —
+// same struct we already build when SENDING (see interactive.go/send.go).
+// Reused here to decode buttons coming FROM WhatsApp Business API accounts.
+type nativeFlowButtonParams struct {
+	DisplayText string `json:"display_text"`
+	Id          string `json:"id"`
+	Url         string `json:"url"`
+}
+
+// parseInteractiveMessage extracts header/body/footer/buttons from an
+// InteractiveMessage (NativeFlow — modern menus sent by WhatsApp Business
+// API accounts) into our internal representation.
+func parseInteractiveMessage(im *waE2E.InteractiveMessage) *WookInteractiveMessageRaw {
+	out := &WookInteractiveMessageRaw{}
+
+	if h := im.GetHeader(); h != nil {
+		out.Title = h.GetTitle()
+		out.Subtitle = h.GetSubtitle()
+	}
+	if b := im.GetBody(); b != nil {
+		out.Body = b.GetText()
+	}
+	if f := im.GetFooter(); f != nil {
+		out.Footer = f.GetText()
+	}
+
+	nf := im.GetNativeFlowMessage()
+	if nf == nil {
+		return out
+	}
+
+	for _, btn := range nf.GetButtons() {
+		name := btn.GetName()
+		var params nativeFlowButtonParams
+		if raw := btn.GetButtonParamsJSON(); raw != "" {
+			_ = json.Unmarshal([]byte(raw), &params)
+		}
+		if params.DisplayText == "" {
+			continue
+		}
+		out.Buttons = append(out.Buttons, WookInteractiveButtonRaw{
+			Type:        name,
+			DisplayText: params.DisplayText,
+			Id:          params.Id,
+			Url:         params.Url,
+		})
+	}
+
+	return out
+}
+
+// parseButtonsMessage extracts header/body/footer/buttons from the legacy
+// ButtonsMessage format (older Business API templates).
+func parseButtonsMessage(bm *waE2E.ButtonsMessage) *WookInteractiveMessageRaw {
+	out := &WookInteractiveMessageRaw{
+		Title:  bm.GetText(), // oneof Header — só populado quando o header é texto simples
+		Body:   bm.GetContentText(),
+		Footer: bm.GetFooterText(),
+	}
+
+	for _, btn := range bm.GetButtons() {
+		display := ""
+		if bt := btn.GetButtonText(); bt != nil {
+			display = bt.GetDisplayText()
+		}
+		if display == "" {
+			continue
+		}
+		out.Buttons = append(out.Buttons, WookInteractiveButtonRaw{
+			Type:        "reply",
+			DisplayText: display,
+			Id:          btn.GetButtonID(),
+		})
+	}
+
+	return out
+}
+
 // parseWAMessage converts a raw waE2E.Message into our internal representation.
 // It only inspects the content of the protobuf message itself –
 // media upload (URL/Base64 generation) is handled later by the caller.
@@ -1148,6 +1226,14 @@ func (s *Whatsmiau) parseWAMessage(m *waE2E.Message) (string, *WookMessageRaw, *
 			DirectPath:    ptv.GetDirectPath(),
 			JpegThumbnail: b64(ptv.GetJPEGThumbnail()),
 		}
+	} else if im := m.GetInteractiveMessage(); im != nil {
+		messageType = "interactiveMessage"
+		ci = im.GetContextInfo()
+		raw.InteractiveMessage = parseInteractiveMessage(im)
+	} else if bm := m.GetButtonsMessage(); bm != nil {
+		messageType = "interactiveMessage"
+		ci = bm.GetContextInfo()
+		raw.InteractiveMessage = parseButtonsMessage(bm)
 	} else if conv := strings.TrimSpace(m.GetConversation()); conv != "" {
 		messageType = "conversation"
 		raw.Conversation = conv

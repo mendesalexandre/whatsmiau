@@ -112,6 +112,34 @@ type WookMessageRaw struct {
 	PollUpdateMessage   *WookPollUpdateMessageRaw   `json:"pollUpdateMessage,omitempty"`
 	PtvMessage          *WookPtvMessageRaw          `json:"ptvMessage,omitempty"`
 	MediaURL            string                      `json:"mediaUrl,omitempty"` // Sent when connect with some storage
+
+	// InteractiveMessage/ButtonsMessage: menu com botões nativos enviado por
+	// contas WhatsApp Business API oficial (ex: template messages da Meta
+	// Cloud API). O linked device consegue decriptar mas não renderiza os
+	// botões nativamente — extraído aqui como estrutura pra o cliente do
+	// webhook (CartZap) reconstruir uma UI própria em vez de perder o
+	// conteúdo. Caso real: menu de boas-vindas da Fiagril (2026-08-14) caía
+	// em "unknown" com message=[] antes desse suporte.
+	InteractiveMessage *WookInteractiveMessageRaw `json:"interactiveMessage,omitempty"`
+}
+
+type WookInteractiveMessageRaw struct {
+	Title    string                      `json:"title,omitempty"`
+	Subtitle string                      `json:"subtitle,omitempty"`
+	Body     string                      `json:"body,omitempty"`
+	Footer   string                      `json:"footer,omitempty"`
+	Buttons  []WookInteractiveButtonRaw  `json:"buttons,omitempty"`
+}
+
+type WookInteractiveButtonRaw struct {
+	// Type é o "name" do NativeFlowButton (ex: "quick_reply", "cta_url",
+	// "cta_copy") ou "reply" pro formato legado ButtonsMessage.
+	Type        string `json:"type,omitempty"`
+	DisplayText string `json:"displayText,omitempty"`
+	Id          string `json:"id,omitempty"`
+	// Url só é preenchido pra botões do tipo cta_url — permite o CartZap
+	// renderizar como link em vez de opção respondível por texto.
+	Url string `json:"url,omitempty"`
 }
 
 type ContactsArrayMessageRaw struct {
