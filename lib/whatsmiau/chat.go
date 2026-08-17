@@ -284,6 +284,12 @@ type BlockContactRequest struct {
 	InstanceID string     `json:"instance_id"`
 	RemoteJID  *types.JID `json:"remote_jid"`
 	Unblock    bool       `json:"unblock"`
+	// LID (opcional) — JID @lid já conhecido do contato (ex: vindo do
+	// remoteLid de uma mensagem recebida). Usado direto quando fornecido,
+	// evitando depender do Store.LIDs interno do whatsmeow (que nem sempre
+	// tem o mapeamento PN->LID pra conversas 1:1 — o cliente/histórico do
+	// caller costuma ter mais contexto que o Store local).
+	LID *types.JID `json:"lid"`
 }
 
 func (s *Whatsmiau) BlockContact(ctx context.Context, data *BlockContactRequest) error {
@@ -296,18 +302,24 @@ func (s *Whatsmiau) BlockContact(ctx context.Context, data *BlockContactRequest)
 		return whatsmeow.ErrUnknownServer
 	}
 
-	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
-
 	// UpdateBlocklist não resolve LID internamente (diferente de SendMessage,
 	// que tem essa lógica embutida) — manda o IQ com exatamente o JID
 	// passado. Contas migradas pro novo addressing (LID) fazem o servidor
 	// recusar um IQ de blocklist endereçado por telefone puro com
 	// "bad-request, addressing_mode=lid" (achado real: Fiagril, 2026-08-17).
-	// Mesmo padrão usado por resolveTCTokenStorageLID no próprio whatsmeow.
-	target := resolved.ToNonAD()
-	if target.Server == types.DefaultUserServer {
-		if lid, err := client.Store.LIDs.GetLIDForPN(ctx, target); err == nil && !lid.IsEmpty() {
-			target = lid.ToNonAD()
+	var target types.JID
+	if data.LID != nil {
+		target = data.LID.ToNonAD()
+	} else {
+		resolved := s.resolveJID(ctx, client, *data.RemoteJID)
+		target = resolved.ToNonAD()
+		if target.Server == types.DefaultUserServer {
+			// Fallback pro Store interno (padrão de resolveTCTokenStorageLID)
+			// — raramente tem o mapeamento pra conversas 1:1, mas não custa
+			// tentar antes de desistir e mandar por telefone mesmo.
+			if lid, err := client.Store.LIDs.GetLIDForPN(ctx, target); err == nil && !lid.IsEmpty() {
+				target = lid.ToNonAD()
+			}
 		}
 	}
 

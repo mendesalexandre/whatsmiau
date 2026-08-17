@@ -422,10 +422,20 @@ func (s *Chat) BlockContact(ctx echo.Context) error {
 		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid number")
 	}
 
+	var lidJID *types.JID
+	if request.Lid != "" {
+		parsed, err := types.ParseJID(request.Lid)
+		if err != nil {
+			return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid lid")
+		}
+		lidJID = &parsed
+	}
+
 	if err := s.whatsmiau.BlockContact(ctx.Request().Context(), &whatsmiau.BlockContactRequest{
 		InstanceID: request.InstanceID,
 		RemoteJID:  jid,
 		Unblock:    request.Unblock,
+		LID:        lidJID,
 	}); err != nil {
 		if errors.Is(err, whatsmeow.ErrClientIsNil) {
 			return utils.HTTPFail(ctx, http.StatusNotFound, err, "instance not found or not connected")

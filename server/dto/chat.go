@@ -86,11 +86,15 @@ type DeleteMessageForEveryoneRequestKey struct {
 
 // BlockContactRequest — payload pra bloquear/desbloquear um contato na
 // conta WhatsApp conectada. Number aceita formato solto (com ou sem
-// @s.whatsapp.net) — mesma convenção de outros endpoints de chat.
+// @s.whatsapp.net) — mesma convenção de outros endpoints de chat. Lid
+// (opcional) é o JID @lid já conhecido do contato — necessário pra
+// contatos migrados pro novo addressing, que o servidor recusa bloquear
+// quando endereçados só por telefone.
 type BlockContactRequest struct {
 	InstanceID string `param:"instance" validate:"required" swaggerignore:"true"`
 	Number     string `json:"number" validate:"required"`
 	Unblock    bool   `json:"unblock"`
+	Lid        string `json:"lid"`
 }
 
 // EditMessageRequest — payload pra editar uma mensagem já enviada.
