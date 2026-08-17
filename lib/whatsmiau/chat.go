@@ -298,12 +298,25 @@ func (s *Whatsmiau) BlockContact(ctx context.Context, data *BlockContactRequest)
 
 	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
 
+	// UpdateBlocklist não resolve LID internamente (diferente de SendMessage,
+	// que tem essa lógica embutida) — manda o IQ com exatamente o JID
+	// passado. Contas migradas pro novo addressing (LID) fazem o servidor
+	// recusar um IQ de blocklist endereçado por telefone puro com
+	// "bad-request, addressing_mode=lid" (achado real: Fiagril, 2026-08-17).
+	// Mesmo padrão usado por resolveTCTokenStorageLID no próprio whatsmeow.
+	target := resolved.ToNonAD()
+	if target.Server == types.DefaultUserServer {
+		if lid, err := client.Store.LIDs.GetLIDForPN(ctx, target); err == nil && !lid.IsEmpty() {
+			target = lid.ToNonAD()
+		}
+	}
+
 	action := events.BlocklistChangeActionBlock
 	if data.Unblock {
 		action = events.BlocklistChangeActionUnblock
 	}
 
-	_, err := client.UpdateBlocklist(ctx, resolved, action)
+	_, err := client.UpdateBlocklist(ctx, target, action)
 	return err
 }
 
