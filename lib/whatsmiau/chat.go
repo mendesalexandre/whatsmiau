@@ -8,6 +8,7 @@ import (
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
+	"go.mau.fi/whatsmeow/types/events"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"google.golang.org/protobuf/proto"
@@ -271,6 +272,38 @@ func (s *Whatsmiau) RevokeMessage(data *RevokeMessageRequest) error {
 
 	revoke := client.BuildRevoke(*data.RemoteJID, sender, data.MessageID)
 	_, err := client.SendMessage(context.TODO(), *data.RemoteJID, revoke)
+	return err
+}
+
+// BlockContactRequest — bloqueia (ou desbloqueia) um contato na conta
+// WhatsApp conectada. Ação simétrica à do app: uma vez bloqueado, o contato
+// não consegue mais mandar mensagens pra essa conta — resolve casos de
+// automação de terceiros presa em loop (ex: Fiagril, 2026-08-17) sem
+// precisar mexer no celular físico.
+type BlockContactRequest struct {
+	InstanceID string     `json:"instance_id"`
+	RemoteJID  *types.JID `json:"remote_jid"`
+	Unblock    bool       `json:"unblock"`
+}
+
+func (s *Whatsmiau) BlockContact(ctx context.Context, data *BlockContactRequest) error {
+	client, ok := s.clients.Load(data.InstanceID)
+	if !ok {
+		return whatsmeow.ErrClientIsNil
+	}
+
+	if data.RemoteJID == nil {
+		return whatsmeow.ErrUnknownServer
+	}
+
+	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
+
+	action := events.BlocklistChangeActionBlock
+	if data.Unblock {
+		action = events.BlocklistChangeActionUnblock
+	}
+
+	_, err := client.UpdateBlocklist(ctx, resolved, action)
 	return err
 }
 

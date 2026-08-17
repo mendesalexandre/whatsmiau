@@ -84,6 +84,15 @@ type DeleteMessageForEveryoneRequestKey struct {
 	ID        string `json:"id" validate:"required"`
 }
 
+// BlockContactRequest — payload pra bloquear/desbloquear um contato na
+// conta WhatsApp conectada. Number aceita formato solto (com ou sem
+// @s.whatsapp.net) — mesma convenção de outros endpoints de chat.
+type BlockContactRequest struct {
+	InstanceID string `param:"instance" validate:"required" swaggerignore:"true"`
+	Number     string `json:"number" validate:"required"`
+	Unblock    bool   `json:"unblock"`
+}
+
 // EditMessageRequest — payload pra editar uma mensagem já enviada.
 // WhatsApp permite editar até ~15min após envio (enforced server-side).
 // V1 só aceita texto (Conversation).

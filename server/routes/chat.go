@@ -19,6 +19,7 @@ func Chat(group *echo.Group) {
 	group.POST("/delete-message-for-everyone", controller.DeleteMessageForEveryone)
 	group.POST("/edit-message", controller.EditMessage)
 	group.POST("/privacy-settings", controller.UpdatePrivacySettings)
+	group.POST("/block-contact", controller.BlockContact)
 }
 
 func ChatEVO(group *echo.Group) {
@@ -35,4 +36,5 @@ func ChatEVO(group *echo.Group) {
 	group.POST("/deleteMessageForEveryone/:instance", controller.DeleteMessageForEveryone)
 	group.POST("/editMessage/:instance", controller.EditMessage)
 	group.POST("/updatePrivacySettings/:instance", controller.UpdatePrivacySettings)
+	group.POST("/blockContact/:instance", controller.BlockContact)
 }

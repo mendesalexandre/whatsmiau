@@ -390,6 +390,53 @@ func (s *Chat) DeleteMessageForEveryone(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, map[string]interface{}{})
 }
 
+// BlockContact godoc
+// @Summary      Block or unblock a contact
+// @Description  Blocks (or unblocks, with unblock=true) a contact on the connected WhatsApp
+// @Description  account — same effect as doing it from the phone app. Once blocked, the
+// @Description  contact can no longer send messages to this account.
+// @Tags         Chat
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string                    true  "Instance ID"
+// @Param        body      body      dto.BlockContactRequest  true  "Number to block/unblock"
+// @Success      200       {object}  map[string]interface{}   "Empty object on success"
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      404       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /instance/{instance}/chat/block-contact [post]
+// @Router       /chat/blockContact/{instance} [post]
+func (s *Chat) BlockContact(ctx echo.Context) error {
+	var request dto.BlockContactRequest
+	if err := ctx.Bind(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+	}
+
+	if err := validator.New().Struct(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+	}
+
+	jid, err := numberToJid(request.Number)
+	if err != nil {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid number")
+	}
+
+	if err := s.whatsmiau.BlockContact(ctx.Request().Context(), &whatsmiau.BlockContactRequest{
+		InstanceID: request.InstanceID,
+		RemoteJID:  jid,
+		Unblock:    request.Unblock,
+	}); err != nil {
+		if errors.Is(err, whatsmeow.ErrClientIsNil) {
+			return utils.HTTPFail(ctx, http.StatusNotFound, err, "instance not found or not connected")
+		}
+		zap.L().Error("Whatsmiau.BlockContact failed", zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to block contact")
+	}
+
+	return ctx.JSON(http.StatusOK, map[string]interface{}{})
+}
+
 // EditMessage godoc
 // @Summary      Edit a previously sent message
 // @Description  Edits a message that was already sent via this instance. WhatsApp enforces a ~15min
