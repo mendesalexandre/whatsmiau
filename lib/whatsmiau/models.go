@@ -16,6 +16,8 @@ const (
 	WookMessagesDelete   Wook = "messages.delete"
 	WookMessagesEdit     Wook = "messages.edit"
 	WookEphemeralSetting Wook = "ephemeral.setting"
+	WookCallOffer        Wook = "call.offer"
+	WookCallTerminate    Wook = "call.terminate"
 )
 
 type WookEvent[data any] struct {
@@ -34,7 +36,7 @@ type WookMessageData struct {
 	PushName         string                  `json:"pushName,omitempty"`
 	Status           string                  `json:"status,omitempty"`
 	Message          *WookMessageRaw         `json:"message,omitempty"`
-	ContextInfo      *WookMessageContextInfo  `json:"contextInfo,omitempty"`
+	ContextInfo      *WookMessageContextInfo `json:"contextInfo,omitempty"`
 	MessageType      string                  `json:"messageType,omitempty"`
 	MessageTimestamp int                     `json:"messageTimestamp,omitempty"`
 	InstanceId       string                  `json:"instanceId,omitempty"`
@@ -133,11 +135,11 @@ type WookMessageRaw struct {
 }
 
 type WookInteractiveMessageRaw struct {
-	Title    string                      `json:"title,omitempty"`
-	Subtitle string                      `json:"subtitle,omitempty"`
-	Body     string                      `json:"body,omitempty"`
-	Footer   string                      `json:"footer,omitempty"`
-	Buttons  []WookInteractiveButtonRaw  `json:"buttons,omitempty"`
+	Title    string                     `json:"title,omitempty"`
+	Subtitle string                     `json:"subtitle,omitempty"`
+	Body     string                     `json:"body,omitempty"`
+	Footer   string                     `json:"footer,omitempty"`
+	Buttons  []WookInteractiveButtonRaw `json:"buttons,omitempty"`
 }
 
 type WookInteractiveButtonRaw struct {
@@ -328,6 +330,17 @@ type WookEphemeralSettingData struct {
 	Participant       string `json:"participant,omitempty"`
 	ExpirationSeconds uint32 `json:"expirationSeconds"`
 	InstanceId        string `json:"instanceId,omitempty"`
+}
+
+// WookCallData carrega os dados de um evento de chamada de voz/vídeo —
+// tanto o "offer" (chamada chegando) quanto o "terminate" (chamada
+// encerrada, atendida em outro device, ou perdida). Reason só vem
+// preenchido no terminate (ex: "timeout" = não atendida).
+type WookCallData struct {
+	RemoteJid  string `json:"remoteJid,omitempty"`
+	CallId     string `json:"callId,omitempty"`
+	Reason     string `json:"reason,omitempty"`
+	InstanceId string `json:"instanceId,omitempty"`
 }
 
 type WookMessageUpdateData struct {

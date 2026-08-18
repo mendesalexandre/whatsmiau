@@ -26,6 +26,7 @@ import (
 	"go.mau.fi/whatsmeow/types/events"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
+	"google.golang.org/protobuf/proto"
 )
 
 type emitter struct {
@@ -205,7 +206,6 @@ func (s *Whatsmiau) doEmit(data []byte, url string, headers map[string]string) (
 	return false, false, resp.StatusCode, string(res)
 }
 
-
 func (s *Whatsmiau) emit(body any, url string, headers map[string]string, instanceID string, eventName string) {
 	if url == "" {
 		return
@@ -244,6 +244,10 @@ func (s *Whatsmiau) Handle(id string) whatsmeow.EventHandler {
 				s.handleMessageEvent(id, instance, e, eventMap)
 			case *events.UndecryptableMessage:
 				s.handleUndecryptableMessageEvent(id, instance, e, eventMap)
+			case *events.CallOffer:
+				s.handleCallOfferEvent(id, instance, e, eventMap)
+			case *events.CallTerminate:
+				s.handleCallTerminateEvent(id, instance, e, eventMap)
 			case *events.Receipt:
 				s.handleReceiptEvent(id, instance, e, eventMap)
 			case *events.BusinessName:
@@ -282,6 +286,7 @@ func (s *Whatsmiau) handleLoggedOut(id string) {
 
 	s.clients.Delete(id)
 }
+
 // unwrapTransportLayers desembrulha só as camadas de TRANSPORTE do
 // protobuf (DeviceSentMessage/BotInvokeMessage/EphemeralMessage/
 // ViewOnceMessage/ViewOnceMessageV2/ViewOnceMessageV2Extension/
@@ -494,6 +499,93 @@ func (s *Whatsmiau) handleUndecryptableMessageEvent(id string, instance *models.
 	}
 
 	zap.L().Warn("undecryptable message event", zap.String("instance", id), zap.Any("data", msgData))
+	s.emit(wookEvent, instance.Webhook.Url, instance.Webhook.Headers, instance.ID, string(wookEvent.Event))
+}
+
+// handleCallOfferEvent trata uma chamada de voz/vídeo chegando. A lib base
+// não suporta ATENDER uma chamada (não implementa o pipeline de mídia
+// WebRTC/SRTP do WhatsApp) — só recebe a notificação e consegue rejeitar.
+// Aqui só notificamos via webhook; se instance.RejectCall estiver ligado,
+// rejeita automaticamente também (e manda instance.MsgCall como aviso, se
+// preenchido). RejectCall/MsgCall já existiam no model Instance (copiados
+// do formato Evolution API) mas nunca eram lidos em lugar nenhum.
+func (s *Whatsmiau) handleCallOfferEvent(id string, instance *models.Instance, e *events.CallOffer, eventMap map[string]bool) {
+	if !eventMap["CALL"] {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	remoteJid, _ := s.GetJidLid(ctx, id, e.From)
+
+	callData := &WookCallData{
+		RemoteJid:  remoteJid,
+		CallId:     e.CallID,
+		InstanceId: instance.ID,
+	}
+
+	wookEvent := &WookEvent[WookCallData]{
+		Instance: instance.ID,
+		Data:     callData,
+		DateTime: time.Now(),
+		Event:    WookCallOffer,
+	}
+
+	zap.L().Info("call offer event", zap.String("instance", id), zap.Any("data", callData))
+	s.emit(wookEvent, instance.Webhook.Url, instance.Webhook.Headers, instance.ID, string(wookEvent.Event))
+
+	if !instance.RejectCall {
+		return
+	}
+
+	client, ok := s.clients.Load(id)
+	if !ok {
+		return
+	}
+
+	if err := client.RejectCall(ctx, e.From, e.CallID); err != nil {
+		zap.L().Warn("failed to auto-reject call", zap.String("instance", id), zap.Error(err))
+		return
+	}
+
+	if instance.MsgCall != "" {
+		if _, err := client.SendMessage(ctx, e.From, &waE2E.Message{
+			Conversation: proto.String(instance.MsgCall),
+		}); err != nil {
+			zap.L().Warn("failed to send auto-reject call message", zap.String("instance", id), zap.Error(err))
+		}
+	}
+}
+
+// handleCallTerminateEvent trata o fim de uma chamada — atendida em outro
+// device, encerrada pelo chamador, ou perdida por timeout. Reason vem do
+// próprio WhatsApp (ex: "timeout").
+func (s *Whatsmiau) handleCallTerminateEvent(id string, instance *models.Instance, e *events.CallTerminate, eventMap map[string]bool) {
+	if !eventMap["CALL"] {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	remoteJid, _ := s.GetJidLid(ctx, id, e.From)
+
+	callData := &WookCallData{
+		RemoteJid:  remoteJid,
+		CallId:     e.CallID,
+		Reason:     e.Reason,
+		InstanceId: instance.ID,
+	}
+
+	wookEvent := &WookEvent[WookCallData]{
+		Instance: instance.ID,
+		Data:     callData,
+		DateTime: time.Now(),
+		Event:    WookCallTerminate,
+	}
+
+	zap.L().Info("call terminate event", zap.String("instance", id), zap.Any("data", callData))
 	s.emit(wookEvent, instance.Webhook.Url, instance.Webhook.Headers, instance.ID, string(wookEvent.Event))
 }
 
