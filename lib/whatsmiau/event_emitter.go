@@ -317,6 +317,28 @@ func unwrapTransportLayers(m *waE2E.Message) *waE2E.Message {
 }
 
 func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *events.Message, eventMap map[string]bool) {
+	// Causa raiz real (confirmada via log de diagnóstico em produção,
+	// 2026-08-18): edição de mensagem NÃO chega mais como ProtocolMessage
+	// direto — o WhatsApp mudou pra "Message Secret" (mesma arquitetura já
+	// usada por reação/voto de enquete): o conteúdo real vem criptografado
+	// separadamente em SecretEncryptedMessage.EncPayload, decriptável só com
+	// a messageSecret correspondente (armazenada localmente quando a
+	// mensagem original foi recebida). SecretEncType=MESSAGE_EDIT é o caso
+	// de edição; a lib já tem DecryptSecretEncryptedMessage() pronta pra
+	// isso — só não era chamada aqui.
+	if e.Message.GetSecretEncryptedMessage() != nil {
+		if client, ok := s.clients.Load(id); ok {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			decrypted, err := client.DecryptSecretEncryptedMessage(ctx, e)
+			cancel()
+			if err != nil {
+				zap.L().Warn("failed to decrypt secret encrypted message", zap.String("instance", id), zap.String("msgId", e.Info.ID), zap.Error(err))
+			} else if decrypted != nil {
+				e.Message = decrypted
+			}
+		}
+	}
+
 	// Desembrulha só as camadas de TRANSPORTE (DeviceSentMessage/
 	// EphemeralMessage/ViewOnceMessage/etc) antes de checar ProtocolMessage
 	// — achado real em produção: mensagem de edição embrulhada num desses
@@ -327,19 +349,9 @@ func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *
 	// também desembrulha EditedMessage, mas ao fazer isso ela SUBSTITUI
 	// evt.Message pelo CONTEÚDO NOVO da edição (o texto), não pelo
 	// ProtocolMessage. Usar UnwrapRaw() faz o ProtocolMessage desaparecer
-	// completamente antes do switch abaixo rodar — a mensagem cai no fluxo
-	// genérico do mesmo jeito, só que agora sem nem saber que era edição
-	// (bug real observado em produção: número de teste próprio, editAttribute
-	// presente, mesmo assim caiu em messageType=unknown).
+	// completamente antes do switch abaixo rodar.
 	if m := unwrapTransportLayers(e.Message); m != nil {
-		pmDebug := m.GetProtocolMessage()
-		zap.L().Warn("DEBUG unwrap diagnóstico temporário",
-			zap.String("id", e.Info.ID),
-			zap.Bool("achouProtocolMessage", pmDebug != nil),
-			zap.String("mensagemDesembrulhada", m.String()),
-			zap.String("mensagemOriginal", e.RawMessage.String()),
-		)
-		if pm := pmDebug; pm != nil {
+		if pm := m.GetProtocolMessage(); pm != nil {
 			// handleMessageDeleteEvent/handleMessageEditEvent releem
 			// e.Message.GetProtocolMessage() internamente — precisam ver a
 			// versão já desembrulhada, senão acham pm=nil de novo e a
