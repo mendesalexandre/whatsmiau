@@ -282,18 +282,62 @@ func (s *Whatsmiau) handleLoggedOut(id string) {
 
 	s.clients.Delete(id)
 }
+// unwrapTransportLayers desembrulha só as camadas de TRANSPORTE do
+// protobuf (DeviceSentMessage/BotInvokeMessage/EphemeralMessage/
+// ViewOnceMessage/ViewOnceMessageV2/ViewOnceMessageV2Extension/
+// LottieStickerMessage/DocumentWithCaptionMessage), recursivamente, até
+// sobrar o conteúdo real — igual events.Message.UnwrapRaw() da lib, MENOS
+// o passo de EditedMessage. Esse passo é omitido de propósito: UnwrapRaw
+// desembrulha EditedMessage substituindo pelo CONTEÚDO NOVO da edição (o
+// texto), perdendo o ProtocolMessage que a gente precisa inspecionar aqui.
+func unwrapTransportLayers(m *waE2E.Message) *waE2E.Message {
+	for m != nil {
+		switch {
+		case m.GetDeviceSentMessage().GetMessage() != nil:
+			m = m.GetDeviceSentMessage().GetMessage()
+		case m.GetBotInvokeMessage().GetMessage() != nil:
+			m = m.GetBotInvokeMessage().GetMessage()
+		case m.GetEphemeralMessage().GetMessage() != nil:
+			m = m.GetEphemeralMessage().GetMessage()
+		case m.GetViewOnceMessage().GetMessage() != nil:
+			m = m.GetViewOnceMessage().GetMessage()
+		case m.GetViewOnceMessageV2().GetMessage() != nil:
+			m = m.GetViewOnceMessageV2().GetMessage()
+		case m.GetViewOnceMessageV2Extension().GetMessage() != nil:
+			m = m.GetViewOnceMessageV2Extension().GetMessage()
+		case m.GetLottieStickerMessage().GetMessage() != nil:
+			m = m.GetLottieStickerMessage().GetMessage()
+		case m.GetDocumentWithCaptionMessage().GetMessage() != nil:
+			m = m.GetDocumentWithCaptionMessage().GetMessage()
+		default:
+			return m
+		}
+	}
+	return m
+}
+
 func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *events.Message, eventMap map[string]bool) {
-	// UnwrapRaw ANTES de checar ProtocolMessage — achado real em produção:
-	// edição chegou decriptada com sucesso (sem decrypt-fail), mas
-	// embrulhada em DeviceSentMessage/EphemeralMessage/ViewOnceMessage/etc
-	// (observado vindo de conta verificada/Business), e
-	// e.Message.GetProtocolMessage() só olha o nível superior — sem
-	// desembrulhar primeiro, nunca encontra o ProtocolMessage real, e a
-	// edição cai no fluxo genérico como messageType=unknown em vez de
-	// disparar handleMessageEditEvent.
-	e.UnwrapRaw()
-	if e.Message != nil {
-		if pm := e.Message.GetProtocolMessage(); pm != nil {
+	// Desembrulha só as camadas de TRANSPORTE (DeviceSentMessage/
+	// EphemeralMessage/ViewOnceMessage/etc) antes de checar ProtocolMessage
+	// — achado real em produção: mensagem de edição embrulhada num desses
+	// wrappers nunca era encontrada, porque e.Message.GetProtocolMessage()
+	// só olha o nível superior.
+	//
+	// CUIDADO: events.Message.UnwrapRaw() da lib NÃO serve aqui — ela
+	// também desembrulha EditedMessage, mas ao fazer isso ela SUBSTITUI
+	// evt.Message pelo CONTEÚDO NOVO da edição (o texto), não pelo
+	// ProtocolMessage. Usar UnwrapRaw() faz o ProtocolMessage desaparecer
+	// completamente antes do switch abaixo rodar — a mensagem cai no fluxo
+	// genérico do mesmo jeito, só que agora sem nem saber que era edição
+	// (bug real observado em produção: número de teste próprio, editAttribute
+	// presente, mesmo assim caiu em messageType=unknown).
+	if m := unwrapTransportLayers(e.Message); m != nil {
+		if pm := m.GetProtocolMessage(); pm != nil {
+			// handleMessageDeleteEvent/handleMessageEditEvent releem
+			// e.Message.GetProtocolMessage() internamente — precisam ver a
+			// versão já desembrulhada, senão acham pm=nil de novo e a
+			// edição/exclusão é silenciosamente ignorada.
+			e.Message = m
 			switch pm.GetType() {
 			case waE2E.ProtocolMessage_REVOKE:
 				s.handleMessageDeleteEvent(id, instance, e, eventMap)
