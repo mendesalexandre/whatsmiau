@@ -39,6 +39,14 @@ type WookMessageData struct {
 	InstanceId       string                  `json:"instanceId,omitempty"`
 	Source           string                  `json:"source,omitempty"`
 	PollUpdates      []WookPollUpdate        `json:"pollUpdates,omitempty"`
+
+	// Preenchidos só quando MessageType == "undecryptable" — o whatsmeow não
+	// conseguiu decriptar o conteúdo (falha de sincronização de sessão
+	// Signal), mas esses metadados vêm do envelope XML de fora, disponíveis
+	// mesmo sem decriptar nada por dentro.
+	EditAttribute   string `json:"editAttribute,omitempty"`
+	IsUnavailable   bool   `json:"isUnavailable,omitempty"`
+	DecryptFailMode string `json:"decryptFailMode,omitempty"`
 }
 
 type WookMessageContextInfo struct {

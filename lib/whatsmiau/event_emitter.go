@@ -242,6 +242,8 @@ func (s *Whatsmiau) Handle(id string) whatsmeow.EventHandler {
 			switch e := evt.(type) {
 			case *events.Message:
 				s.handleMessageEvent(id, instance, e, eventMap)
+			case *events.UndecryptableMessage:
+				s.handleUndecryptableMessageEvent(id, instance, e, eventMap)
 			case *events.Receipt:
 				s.handleReceiptEvent(id, instance, e, eventMap)
 			case *events.BusinessName:
@@ -358,6 +360,66 @@ func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *
 	}
 
 	s.emit(wookMessage, instance.Webhook.Url, instance.Webhook.Headers, instance.ID, string(wookMessage.Event))
+}
+
+// handleUndecryptableMessageEvent trata mensagens que o whatsmeow não
+// conseguiu descriptografar (falha de sincronização de sessão Signal —
+// achado real: contato "Andrade & Heemann", 2026-08-18, decrypt-fail="hide").
+// A lib já pede retry automático pro remetente antes de disparar esse
+// evento; se o retry vier decriptável, chega como *events.Message normal
+// depois — aqui só cobrimos o caso de falha (definitiva ou até o retry).
+//
+// Metadados como EditAttribute vêm do envelope XML de FORA da mensagem
+// criptografada, então continuam disponíveis mesmo sem decriptar nada —
+// dá pra avisar se era uma tentativa de EDIÇÃO (o texto novo se perdeu, mas
+// a mensagem original do cliente continua salva e visível de qualquer forma,
+// já que essa falha nunca sobrescreve nada).
+func (s *Whatsmiau) handleUndecryptableMessageEvent(id string, instance *models.Instance, e *events.UndecryptableMessage, eventMap map[string]bool) {
+	if !eventMap["MESSAGES_UPSERT"] {
+		return
+	}
+
+	if strings.Contains(e.Info.Chat.String(), "status") {
+		return
+	}
+
+	if instance.GroupsIgnore && e.Info.Chat.Server == types.GroupServer {
+		return
+	}
+
+	ctx, c := context.WithTimeout(context.Background(), time.Second*5)
+	defer c()
+
+	remoteJid, remoteLid := s.GetJidLid(ctx, id, e.Info.Chat)
+
+	msgData := &WookMessageData{
+		Key: &WookKey{
+			RemoteJid:   remoteJid,
+			RemoteLid:   remoteLid,
+			FromMe:      e.Info.IsFromMe,
+			Id:          e.Info.ID,
+			Participant: e.Info.Sender.ToNonAD().String(),
+		},
+		PushName:         e.Info.PushName,
+		Status:           "received",
+		MessageType:      "undecryptable",
+		MessageTimestamp: int(e.Info.Timestamp.Unix()),
+		InstanceId:       instance.ID,
+		Source:           "whatsapp",
+		EditAttribute:    string(e.Info.Edit),
+		IsUnavailable:    e.IsUnavailable,
+		DecryptFailMode:  string(e.DecryptFailMode),
+	}
+
+	wookEvent := &WookEvent[WookMessageData]{
+		Instance: instance.ID,
+		Data:     msgData,
+		DateTime: time.Now(),
+		Event:    WookMessagesUpsert,
+	}
+
+	zap.L().Warn("undecryptable message event", zap.String("instance", id), zap.Any("data", msgData))
+	s.emit(wookEvent, instance.Webhook.Url, instance.Webhook.Headers, instance.ID, string(wookEvent.Event))
 }
 
 func (s *Whatsmiau) handleMessageDeleteEvent(id string, instance *models.Instance, e *events.Message, eventMap map[string]bool) {
