@@ -524,9 +524,15 @@ func (s *Whatsmiau) handleMessageDeleteEvent(id string, instance *models.Instanc
 	}
 
 	deleteData := &WookMessageDeleteData{
-		Id:          pKey.GetID(),
-		RemoteJid:   keyRemoteJid,
-		FromMe:      pKey.GetFromMe(),
+		Id:        pKey.GetID(),
+		RemoteJid: keyRemoteJid,
+		// pKey.GetFromMe() é sempre true aqui — reflete que a mensagem
+		// original "era minha" do ponto de vista de QUEM A REVOGOU (só o
+		// autor pode revogar a própria msg), não de quem está recebendo
+		// esse evento. e.Info.IsFromMe é o campo certo: reflete se o
+		// PACOTE de revogação em si veio do nosso próprio dispositivo
+		// (nós revogando) ou de outra pessoa (cliente revogando a dele).
+		FromMe:      e.Info.IsFromMe,
 		Participant: pKey.GetParticipant(),
 		Status:      "DELETED",
 		InstanceId:  instance.ID,
@@ -588,9 +594,16 @@ func (s *Whatsmiau) handleMessageEditEvent(id string, instance *models.Instance,
 	}
 
 	editData := &WookMessageEditData{
-		Id:          pKey.GetID(),
-		RemoteJid:   keyRemoteJid,
-		FromMe:      pKey.GetFromMe(),
+		Id:        pKey.GetID(),
+		RemoteJid: keyRemoteJid,
+		// Mesma ressalva do handleMessageDeleteEvent: pKey.GetFromMe() é
+		// sempre true (só o autor edita a própria msg), não diz quem
+		// enviou ESTE pacote de edição. e.Info.IsFromMe é quem realmente
+		// diferencia "cliente editou" (false, processar no Laravel) de
+		// "nós editamos via CartZap" (true, já tratado sincronamente pelo
+		// controller — bug real observado em produção: toda edição de
+		// cliente caía como "fromMe" e era ignorada).
+		FromMe:      e.Info.IsFromMe,
 		Participant: pKey.GetParticipant(),
 		NewMessage:  newMessage,
 		InstanceId:  instance.ID,
