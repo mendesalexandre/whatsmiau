@@ -364,6 +364,9 @@ func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *
 			case waE2E.ProtocolMessage_MESSAGE_EDIT:
 				s.handleMessageEditEvent(id, instance, e, eventMap)
 				return
+			case waE2E.ProtocolMessage_EPHEMERAL_SETTING:
+				s.handleEphemeralSettingEvent(id, instance, e, eventMap)
+				return
 			}
 		}
 	}
@@ -617,6 +620,52 @@ func (s *Whatsmiau) handleMessageEditEvent(id string, instance *models.Instance,
 	}
 
 	zap.L().Debug("message edit event", zap.String("instance", id), zap.Any("data", editData))
+	s.emit(wookEvent, instance.Webhook.Url, instance.Webhook.Headers, instance.ID, string(wookEvent.Event))
+}
+
+// handleEphemeralSettingEvent trata a mudança de config de "mensagens
+// temporárias" de uma conversa (achado real em produção: cliente "Valcedir
+// Paulo", 2026-08-18 — chegava como ProtocolMessage tipo EPHEMERAL_SETTING,
+// caía no fluxo genérico de mensagem, e sem handler específico virava
+// messageType=unknown com conteúdo vazio).
+//
+// Não é conteúdo de mensagem — é um evento de sistema sobre a CONVERSA em
+// si, por isso não usamos a Key do ProtocolMessage (normalmente vazia
+// aqui, já que não aponta pra nenhuma mensagem específica). RemoteJid e
+// Participant vêm do envelope do evento (e.Info), igual
+// handleUndecryptableMessageEvent.
+func (s *Whatsmiau) handleEphemeralSettingEvent(id string, instance *models.Instance, e *events.Message, eventMap map[string]bool) {
+	if !eventMap["MESSAGES_EDIT"] {
+		return
+	}
+
+	if canIgnoreGroup(e, instance) {
+		return
+	}
+
+	pm := e.Message.GetProtocolMessage()
+
+	ctx, c := context.WithTimeout(context.Background(), time.Second*5)
+	defer c()
+
+	remoteJid, _ := s.GetJidLid(ctx, id, e.Info.Chat)
+
+	settingData := &WookEphemeralSettingData{
+		RemoteJid:         remoteJid,
+		FromMe:            e.Info.IsFromMe,
+		Participant:       e.Info.Sender.ToNonAD().String(),
+		ExpirationSeconds: pm.GetEphemeralExpiration(),
+		InstanceId:        instance.ID,
+	}
+
+	wookEvent := &WookEvent[WookEphemeralSettingData]{
+		Instance: instance.ID,
+		Data:     settingData,
+		DateTime: time.Now(),
+		Event:    WookEphemeralSetting,
+	}
+
+	zap.L().Debug("ephemeral setting event", zap.String("instance", id), zap.Any("data", settingData))
 	s.emit(wookEvent, instance.Webhook.Url, instance.Webhook.Headers, instance.ID, string(wookEvent.Event))
 }
 

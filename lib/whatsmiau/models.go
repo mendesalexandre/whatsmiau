@@ -15,6 +15,7 @@ const (
 	WookConnectionUpdate Wook = "connection.update"
 	WookMessagesDelete   Wook = "messages.delete"
 	WookMessagesEdit     Wook = "messages.edit"
+	WookEphemeralSetting Wook = "ephemeral.setting"
 )
 
 type WookEvent[data any] struct {
@@ -314,6 +315,19 @@ type WookMessageEditData struct {
 	Participant string `json:"participant,omitempty"`
 	NewMessage  string `json:"newMessage,omitempty"`
 	InstanceId  string `json:"instanceId,omitempty"`
+}
+
+// WookEphemeralSettingData carrega a mudança de config de "mensagens
+// temporárias" de uma conversa (ProtocolMessage tipo EPHEMERAL_SETTING —
+// não é conteúdo de mensagem, é um evento de configuração de chat).
+// ExpirationSeconds=0 significa que foi desativado; valores comuns:
+// 86400 (24h), 604800 (7 dias), 7776000 (90 dias).
+type WookEphemeralSettingData struct {
+	RemoteJid         string `json:"remoteJid,omitempty"`
+	FromMe            bool   `json:"fromMe"`
+	Participant       string `json:"participant,omitempty"`
+	ExpirationSeconds uint32 `json:"expirationSeconds"`
+	InstanceId        string `json:"instanceId,omitempty"`
 }
 
 type WookMessageUpdateData struct {
