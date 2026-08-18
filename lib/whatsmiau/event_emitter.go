@@ -283,6 +283,15 @@ func (s *Whatsmiau) handleLoggedOut(id string) {
 	s.clients.Delete(id)
 }
 func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *events.Message, eventMap map[string]bool) {
+	// UnwrapRaw ANTES de checar ProtocolMessage — achado real em produção:
+	// edição chegou decriptada com sucesso (sem decrypt-fail), mas
+	// embrulhada em DeviceSentMessage/EphemeralMessage/ViewOnceMessage/etc
+	// (observado vindo de conta verificada/Business), e
+	// e.Message.GetProtocolMessage() só olha o nível superior — sem
+	// desembrulhar primeiro, nunca encontra o ProtocolMessage real, e a
+	// edição cai no fluxo genérico como messageType=unknown em vez de
+	// disparar handleMessageEditEvent.
+	e.UnwrapRaw()
 	if e.Message != nil {
 		if pm := e.Message.GetProtocolMessage(); pm != nil {
 			switch pm.GetType() {
