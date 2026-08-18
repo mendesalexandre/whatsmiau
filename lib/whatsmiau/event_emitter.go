@@ -332,7 +332,14 @@ func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *
 	// (bug real observado em produção: número de teste próprio, editAttribute
 	// presente, mesmo assim caiu em messageType=unknown).
 	if m := unwrapTransportLayers(e.Message); m != nil {
-		if pm := m.GetProtocolMessage(); pm != nil {
+		pmDebug := m.GetProtocolMessage()
+		zap.L().Warn("DEBUG unwrap diagnóstico temporário",
+			zap.String("id", e.Info.ID),
+			zap.Bool("achouProtocolMessage", pmDebug != nil),
+			zap.String("mensagemDesembrulhada", m.String()),
+			zap.String("mensagemOriginal", e.RawMessage.String()),
+		)
+		if pm := pmDebug; pm != nil {
 			// handleMessageDeleteEvent/handleMessageEditEvent releem
 			// e.Message.GetProtocolMessage() internamente — precisam ver a
 			// versão já desembrulhada, senão acham pm=nil de novo e a
