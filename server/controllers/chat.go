@@ -200,6 +200,79 @@ func (s *Chat) GetBase64FromMediaMessage(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, resp)
 }
 
+// FindChats godoc
+// @Summary      List chats with stored messages
+// @Description  Evolution API v2 compatible endpoint. Lists remoteJIDs that have messages persisted locally (message store) — used by CartZap's backfill (sync:mensagens) to reconstruct a window of missed messages without re-pairing the session.
+// @Tags         Chat
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string  true  "Instance ID"
+// @Success      200       {array}   whatsmiau.FindChatsRecord
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /chat/findChats/{instance} [post]
+func (s *Chat) FindChats(ctx echo.Context) error {
+	instanceID := ctx.Param("instance")
+	if instanceID == "" {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, nil, "instance ID is required in the URL path")
+	}
+
+	response, err := s.whatsmiau.FindChats(ctx.Request().Context(), instanceID)
+	if err != nil {
+		zap.L().Error("Whatsmiau.FindChats failed", zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to list chats")
+	}
+
+	return ctx.JSON(http.StatusOK, response)
+}
+
+// FindMessages godoc
+// @Summary      List stored messages for a chat
+// @Description  Evolution API v2 compatible endpoint. Paginated, most recent first — used by CartZap's backfill (sync:mensagens).
+// @Tags         Chat
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string                     true  "Instance ID"
+// @Param        body      body      dto.FindMessagesRequest    true  "Filter and pagination"
+// @Success      200       {object}  whatsmiau.FindMessagesResponse
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      422       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /chat/findMessages/{instance} [post]
+func (s *Chat) FindMessages(ctx echo.Context) error {
+	instanceID := ctx.Param("instance")
+	if instanceID == "" {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, nil, "instance ID is required in the URL path")
+	}
+
+	var request dto.FindMessagesRequest
+	if err := ctx.Bind(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+	}
+
+	if err := validator.New().Struct(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+	}
+
+	page := request.Page
+	if page <= 0 {
+		page = 1
+	}
+	limit := request.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+
+	response, err := s.whatsmiau.FindMessages(ctx.Request().Context(), instanceID, request.Where.Key.RemoteJid, page, limit)
+	if err != nil {
+		zap.L().Error("Whatsmiau.FindMessages failed", zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to list messages")
+	}
+
+	return ctx.JSON(http.StatusOK, response)
+}
+
 // NumberExists godoc
 // @Summary      Check if numbers exist on WhatsApp
 // @Description  Checks whether the given phone numbers are registered on WhatsApp

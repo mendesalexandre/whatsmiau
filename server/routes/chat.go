@@ -37,4 +37,11 @@ func ChatEVO(group *echo.Group) {
 	group.POST("/editMessage/:instance", controller.EditMessage)
 	group.POST("/updatePrivacySettings/:instance", controller.UpdatePrivacySettings)
 	group.POST("/blockContact/:instance", controller.BlockContact)
+	// EvolutionService::getChats() usa POST (padrão Evolution API real);
+	// WhatsMiauService::getChats() usa GET (divergência pré-existente entre
+	// as duas classes Laravel) — registrado nos dois verbos pra não
+	// depender de qual client PHP está chamando.
+	group.POST("/findChats/:instance", controller.FindChats)
+	group.GET("/findChats/:instance", controller.FindChats)
+	group.POST("/findMessages/:instance", controller.FindMessages)
 }

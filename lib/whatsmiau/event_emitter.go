@@ -440,6 +440,7 @@ func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *
 	}
 
 	s.emit(wookMessage, instance.Webhook.Url, instance.Webhook.Headers, instance.ID, string(wookMessage.Event))
+	s.storeMessageAsync(instance.ID, messageData)
 }
 
 // handleUndecryptableMessageEvent trata mensagens que o whatsmeow não
@@ -1069,6 +1070,7 @@ func (s *Whatsmiau) emitHistoryMessages(id string, instance *models.Instance, e 
 			}
 
 			s.emit(wookMessage, instance.Webhook.Url, instance.Webhook.Headers, instance.ID, string(wookMessage.Event))
+			s.storeMessageAsync(instance.ID, messageData)
 			total++
 		}
 	}

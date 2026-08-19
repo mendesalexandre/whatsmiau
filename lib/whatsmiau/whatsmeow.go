@@ -1,6 +1,7 @@
 package whatsmiau
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
@@ -39,6 +40,7 @@ type Whatsmiau struct {
 	fileStorage        interfaces.Storage
 	handlerSemaphore   chan struct{}
 	webhookErrors      *webhookErrorBuffer
+	messageStore       *messageStore
 }
 
 var instance *Whatsmiau
@@ -131,6 +133,19 @@ func LoadMiau(ctx context.Context, container *sqlstore.Container) {
 		}
 	}
 
+	// Persistência auxiliar pra /chat/findChats e /chat/findMessages
+	// (Evolution-compat) — dá suporte ao backfill do CartZap (sync:mensagens)
+	// sem depender de re-parear a sessão via QR. Boot não falha se isso der
+	// erro (feature auxiliar, não crítica pro core de mensageria).
+	var msgStore *messageStore
+	if storeDB, err := sql.Open(env.Env.DBDialect, env.Env.DBURL); err != nil {
+		zap.L().Error("failed to open message store db", zap.Error(err))
+	} else if msgStore, err = newMessageStore(storeDB, env.Env.DBDialect); err != nil {
+		zap.L().Error("failed to init message store", zap.Error(err))
+		_ = storeDB.Close()
+		msgStore = nil
+	}
+
 	instance = &Whatsmiau{
 		clients:            clients,
 		container:          container,
@@ -149,6 +164,7 @@ func LoadMiau(ctx context.Context, container *sqlstore.Container) {
 		fileStorage:      storage,
 		handlerSemaphore: make(chan struct{}, env.Env.HandlerSemaphoreSize),
 		webhookErrors:    newWebhookErrorBuffer(20),
+		messageStore:     msgStore,
 	}
 
 	go instance.startEmitter()

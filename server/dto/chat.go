@@ -41,6 +41,24 @@ type NumberExistsRequest struct {
 	Numbers []string `json:"numbers"     validate:"required,min=1,dive,required"`
 }
 
+// FindMessagesRequest mirrors the Evolution API v2 payload for
+// POST /chat/findMessages/{instance} — where.key.remoteJid is the only
+// filter actually used (CartZap's WhatsMiauService::getMessages sends
+// exactly this shape).
+type FindMessagesRequest struct {
+	Where FindMessagesWhere `json:"where" validate:"required"`
+	Page  int               `json:"page"`
+	Limit int               `json:"limit"`
+}
+
+type FindMessagesWhere struct {
+	Key FindMessagesWhereKey `json:"key" validate:"required"`
+}
+
+type FindMessagesWhereKey struct {
+	RemoteJid string `json:"remoteJid" validate:"required"`
+}
+
 // FetchProfilePictureUrlRequest mirrors the Evolution API v2 payload for
 // POST /chat/fetchProfilePictureUrl/{instance}.
 type FetchProfilePictureUrlRequest struct {
