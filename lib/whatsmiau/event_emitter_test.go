@@ -1,6 +1,7 @@
 package whatsmiau
 
 import (
+	"strings"
 	"testing"
 
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -105,5 +106,43 @@ func TestParseWAMessageNonViewOnceUnaffected(t *testing.T) {
 	}
 	if raw.Conversation != "oi" {
 		t.Fatalf("expected conversation text preserved, got %q", raw.Conversation)
+	}
+}
+
+// Achado real (2026-08-19): ListMessage não tem case dedicado —
+// cai em "unknown". Antes desse fix, raw.RawUnknown ficava sempre vazio,
+// perdendo qualquer chance de reconstruir o que o cliente mandou depois.
+func TestParseWAMessageUnknownTypeDumpsRawProtoJSON(t *testing.T) {
+	s := &Whatsmiau{}
+	m := &waE2E.Message{
+		ListMessage: &waE2E.ListMessage{
+			Title:       proto.String("Escolha uma opção"),
+			Description: proto.String("teste"),
+		},
+	}
+
+	messageType, raw, _ := s.parseWAMessage(m)
+
+	if messageType != "unknown" {
+		t.Fatalf("expected unknown, got %q", messageType)
+	}
+	if len(raw.RawUnknown) == 0 {
+		t.Fatalf("expected RawUnknown populated with the raw proto dump, got empty")
+	}
+	if !strings.Contains(string(raw.RawUnknown), "Escolha uma opção") {
+		t.Fatalf("expected RawUnknown to contain the original field content, got %q", string(raw.RawUnknown))
+	}
+}
+
+func TestParseWAMessageKnownTypeLeavesRawUnknownEmpty(t *testing.T) {
+	s := &Whatsmiau{}
+	m := &waE2E.Message{
+		Conversation: proto.String("oi"),
+	}
+
+	_, raw, _ := s.parseWAMessage(m)
+
+	if len(raw.RawUnknown) != 0 {
+		t.Fatalf("expected RawUnknown empty for a known/handled type, got %q", string(raw.RawUnknown))
 	}
 }

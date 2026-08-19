@@ -1,6 +1,7 @@
 package whatsmiau
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/emersion/go-vcard"
@@ -132,6 +133,13 @@ type WookMessageRaw struct {
 	// conteúdo. Caso real: menu de boas-vindas da Fiagril (2026-08-14) caía
 	// em "unknown" com message=[] antes desse suporte.
 	InteractiveMessage *WookInteractiveMessageRaw `json:"interactiveMessage,omitempty"`
+
+	// RawUnknown: quando messageType="unknown" (nenhum dos cases acima
+	// bateu), guarda o dump JSON bruto do proto waE2E.Message inteiro via
+	// protojson.Marshal. Não é decodificado/interpretado — é a rede de
+	// segurança pra nunca mais perder um tipo de mensagem novo sem deixar
+	// rastro nenhum (achado real: 2026-08-19).
+	RawUnknown json.RawMessage `json:"rawUnknown,omitempty"`
 }
 
 type WookInteractiveMessageRaw struct {

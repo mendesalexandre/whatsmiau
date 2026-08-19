@@ -26,6 +26,7 @@ import (
 	"go.mau.fi/whatsmeow/types/events"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -1533,6 +1534,22 @@ func (s *Whatsmiau) parseWAMessage(m *waE2E.Message) (string, *WookMessageRaw, *
 		ci = et.GetContextInfo()
 	} else {
 		messageType = "unknown"
+
+		// Nunca mais perder o conteúdo de um tipo de mensagem que ainda não
+		// decodificamos (achado real: 2026-08-19 — messageType
+		// unknown com message=[] vazio, sem NENHUM dado sobrando pra
+		// reconstruir o que o cliente mandou, e sem acesso ao celular dele
+		// pra conferir). protojson.Marshal serializa TODOS os campos
+		// populados do proto genérico, independente de já termos um case
+		// dedicado ou não — cobre qualquer tipo futuro (template, list,
+		// order, product, interactive-response, etc) sem precisar prever
+		// qual vai aparecer. Best-effort: falha aqui não deve derrubar o
+		// processamento do evento.
+		if rawJSON, err := protojson.Marshal(m); err == nil {
+			raw.RawUnknown = json.RawMessage(rawJSON)
+		} else {
+			zap.L().Warn("parseWAMessage: falha ao serializar mensagem de tipo desconhecido", zap.Error(err))
+		}
 	}
 
 	// O wrapper viewOnceMessage/V2/V2Extension não carrega a flag ViewOnce
