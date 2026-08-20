@@ -109,15 +109,16 @@ func TestParseWAMessageNonViewOnceUnaffected(t *testing.T) {
 	}
 }
 
-// Achado real (2026-08-19): ListMessage não tem case dedicado —
-// cai em "unknown". Antes desse fix, raw.RawUnknown ficava sempre vazio,
-// perdendo qualquer chance de reconstruir o que o cliente mandou depois.
+// Achado real (2026-08-19): tipos de proto sem case dedicado (ex:
+// ProductMessage) caem em "unknown". Antes desse fix, raw.RawUnknown ficava
+// sempre vazio, perdendo qualquer chance de reconstruir o que o cliente
+// mandou depois. ListMessage NÃO serve mais como exemplo aqui — ganhou case
+// dedicado em 2026-08-20 (ver TestParseWAMessageListMessage*).
 func TestParseWAMessageUnknownTypeDumpsRawProtoJSON(t *testing.T) {
 	s := &Whatsmiau{}
 	m := &waE2E.Message{
-		ListMessage: &waE2E.ListMessage{
-			Title:       proto.String("Escolha uma opção"),
-			Description: proto.String("teste"),
+		ProductMessage: &waE2E.ProductMessage{
+			Body: proto.String("Escolha um produto"),
 		},
 	}
 
@@ -129,8 +130,88 @@ func TestParseWAMessageUnknownTypeDumpsRawProtoJSON(t *testing.T) {
 	if len(raw.RawUnknown) == 0 {
 		t.Fatalf("expected RawUnknown populated with the raw proto dump, got empty")
 	}
-	if !strings.Contains(string(raw.RawUnknown), "Escolha uma opção") {
+	if !strings.Contains(string(raw.RawUnknown), "Escolha um produto") {
 		t.Fatalf("expected RawUnknown to contain the original field content, got %q", string(raw.RawUnknown))
+	}
+}
+
+// Achado real (2026-08-20): conta business enviando um menu ListMessage
+// (sections/rows) — protocolo diferente do InteractiveMessage/ButtonsMessage
+// já suportado (Fiagril, 2026-08-14), mesma classe de problema.
+func TestParseWAMessageListMessageSingleSection(t *testing.T) {
+	s := &Whatsmiau{}
+	m := &waE2E.Message{
+		ListMessage: &waE2E.ListMessage{
+			Description: proto.String("Como podemos ajudá-lo?"),
+			FooterText:  proto.String("Selecione uma opção"),
+			Sections: []*waE2E.ListMessage_Section{
+				{
+					Rows: []*waE2E.ListMessage_Row{
+						{Title: proto.String("Certidão"), RowID: proto.String("row-1")},
+						{Title: proto.String("Financeiro"), RowID: proto.String("row-2")},
+					},
+				},
+			},
+		},
+	}
+
+	messageType, raw, _ := s.parseWAMessage(m)
+
+	if messageType != "interactiveMessage" {
+		t.Fatalf("expected interactiveMessage, got %q", messageType)
+	}
+	if raw.InteractiveMessage == nil {
+		t.Fatalf("expected InteractiveMessage populated")
+	}
+	if raw.InteractiveMessage.Body != "Como podemos ajudá-lo?" {
+		t.Fatalf("expected body preserved, got %q", raw.InteractiveMessage.Body)
+	}
+	if raw.InteractiveMessage.Footer != "Selecione uma opção" {
+		t.Fatalf("expected footer preserved, got %q", raw.InteractiveMessage.Footer)
+	}
+	if len(raw.InteractiveMessage.Buttons) != 2 {
+		t.Fatalf("expected 2 buttons, got %d", len(raw.InteractiveMessage.Buttons))
+	}
+	// Section única — sem prefixo de título de section.
+	if raw.InteractiveMessage.Buttons[0].DisplayText != "Certidão" {
+		t.Fatalf("expected first option 'Certidão' without prefix, got %q", raw.InteractiveMessage.Buttons[0].DisplayText)
+	}
+	if raw.InteractiveMessage.Buttons[1].Id != "row-2" {
+		t.Fatalf("expected row id preserved, got %q", raw.InteractiveMessage.Buttons[1].Id)
+	}
+}
+
+func TestParseWAMessageListMessageMultipleSectionsPrefixesTitle(t *testing.T) {
+	s := &Whatsmiau{}
+	m := &waE2E.Message{
+		ListMessage: &waE2E.ListMessage{
+			Sections: []*waE2E.ListMessage_Section{
+				{
+					Title: proto.String("Financeiro"),
+					Rows: []*waE2E.ListMessage_Row{
+						{Title: proto.String("Boleto"), RowID: proto.String("row-1")},
+					},
+				},
+				{
+					Title: proto.String("Suporte"),
+					Rows: []*waE2E.ListMessage_Row{
+						{Title: proto.String("Reclamação"), RowID: proto.String("row-2")},
+					},
+				},
+			},
+		},
+	}
+
+	_, raw, _ := s.parseWAMessage(m)
+
+	if len(raw.InteractiveMessage.Buttons) != 2 {
+		t.Fatalf("expected 2 buttons, got %d", len(raw.InteractiveMessage.Buttons))
+	}
+	if raw.InteractiveMessage.Buttons[0].DisplayText != "Financeiro: Boleto" {
+		t.Fatalf("expected section title prefixed, got %q", raw.InteractiveMessage.Buttons[0].DisplayText)
+	}
+	if raw.InteractiveMessage.Buttons[1].DisplayText != "Suporte: Reclamação" {
+		t.Fatalf("expected section title prefixed, got %q", raw.InteractiveMessage.Buttons[1].DisplayText)
 	}
 }
 

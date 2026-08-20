@@ -1252,6 +1252,44 @@ func parseButtonsMessage(bm *waE2E.ButtonsMessage) *WookInteractiveMessageRaw {
 	return out
 }
 
+// parseListMessage extrai título/descrição/rodapé/opções de um ListMessage
+// (menu tipo "lista" de conta WhatsApp Business API oficial — sections com
+// rows, diferente do NativeFlowMessage usado por InteractiveMessage). Achata
+// todas as sections numa lista única de "botões": quando há mais de uma
+// section, prefixa o texto da opção com o título da section (ex: "Financeiro:
+// Boleto") pra não perder a organização original — o CartZap hoje só sabe
+// renderizar uma lista plana de opções, não sections aninhadas.
+func parseListMessage(lm *waE2E.ListMessage) *WookInteractiveMessageRaw {
+	out := &WookInteractiveMessageRaw{
+		Title:  lm.GetTitle(),
+		Body:   lm.GetDescription(),
+		Footer: lm.GetFooterText(),
+	}
+
+	sections := lm.GetSections()
+	multiplasSections := len(sections) > 1
+
+	for _, section := range sections {
+		prefixo := ""
+		if multiplasSections && section.GetTitle() != "" {
+			prefixo = section.GetTitle() + ": "
+		}
+		for _, row := range section.GetRows() {
+			display := row.GetTitle()
+			if display == "" {
+				continue
+			}
+			out.Buttons = append(out.Buttons, WookInteractiveButtonRaw{
+				Type:        "list_row",
+				DisplayText: prefixo + display,
+				Id:          row.GetRowID(),
+			})
+		}
+	}
+
+	return out
+}
+
 // parseWAMessage converts a raw waE2E.Message into our internal representation.
 // It only inspects the content of the protobuf message itself –
 // media upload (URL/Base64 generation) is handled later by the caller.
@@ -1525,6 +1563,17 @@ func (s *Whatsmiau) parseWAMessage(m *waE2E.Message) (string, *WookMessageRaw, *
 		messageType = "interactiveMessage"
 		ci = bm.GetContextInfo()
 		raw.InteractiveMessage = parseButtonsMessage(bm)
+	} else if lm := m.GetListMessage(); lm != nil {
+		// Menu tipo "lista" (sections/rows) de conta WhatsApp Business API
+		// oficial — mesma classe de problema do InteractiveMessage/
+		// ButtonsMessage (Fiagril, 2026-08-14), formato diferente. Achado
+		// real: conta business com menu de 9 opções em 1 seção só,
+		// caindo em "unknown" antes desse suporte (2026-08-20).
+		// Reaproveita o MESMO WookInteractiveMessageRaw pra não exigir
+		// mudança nenhuma downstream — CartZap já sabe renderizar isso.
+		messageType = "interactiveMessage"
+		ci = lm.GetContextInfo()
+		raw.InteractiveMessage = parseListMessage(lm)
 	} else if conv := strings.TrimSpace(m.GetConversation()); conv != "" {
 		messageType = "conversation"
 		raw.Conversation = conv
