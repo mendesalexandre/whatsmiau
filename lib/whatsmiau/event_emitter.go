@@ -373,6 +373,21 @@ func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *
 			case waE2E.ProtocolMessage_EPHEMERAL_SETTING:
 				s.handleEphemeralSettingEvent(id, instance, e, eventMap)
 				return
+			default:
+				// Qualquer outro tipo de ProtocolMessage (EPHEMERAL_SYNC_
+				// RESPONSE, HISTORY_SYNC_NOTIFICATION, APP_STATE_SYNC_KEY_
+				// SHARE, LID_MIGRATION_MAPPING_SYNC, etc) é housekeeping
+				// interno do protocolo — sincronização de estado entre os
+				// próprios dispositivos vinculados do dono da conta, NUNCA
+				// conteúdo de cliente. Sem esse default, caía no fluxo
+				// normal de mensagem, e como parseWAMessage não decodifica
+				// ProtocolMessage, virava "unknown" — um placeholder
+				// confuso pro atendente sobre uma "mensagem" que nunca
+				// teve conteúdo nenhum pra ele ver. Achado real
+				// (EPHEMERAL_SYNC_RESPONSE, 2026-08-20).
+				zap.L().Debug("dropping internal protocol message, not customer content",
+					zap.String("instance", id), zap.String("type", pm.GetType().String()))
+				return
 			}
 		}
 	}
