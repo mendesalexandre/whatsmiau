@@ -152,13 +152,20 @@ type WookInteractiveMessageRaw struct {
 
 type WookInteractiveButtonRaw struct {
 	// Type é o "name" do NativeFlowButton (ex: "quick_reply", "cta_url",
-	// "cta_copy") ou "reply" pro formato legado ButtonsMessage.
+	// "cta_copy") ou "reply" pro formato legado ButtonsMessage, ou
+	// "list_row" pro formato ListMessage.
 	Type        string `json:"type,omitempty"`
 	DisplayText string `json:"displayText,omitempty"`
 	Id          string `json:"id,omitempty"`
 	// Url só é preenchido pra botões do tipo cta_url — permite o CartZap
 	// renderizar como link em vez de opção respondível por texto.
 	Url string `json:"url,omitempty"`
+	// Description só é preenchida pra linhas de ListMessage (row.description
+	// — a legenda que aparece embaixo do título de cada opção na UI nativa
+	// do WhatsApp, ex: "Titulos e Documentos" com legenda "(Cartas de
+	// Anuência, Contratos de Cessão, ...)"). InteractiveMessage/
+	// ButtonsMessage não têm esse conceito, fica sempre vazio pra eles.
+	Description string `json:"description,omitempty"`
 }
 
 type ContactsArrayMessageRaw struct {

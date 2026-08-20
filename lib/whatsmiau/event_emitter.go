@@ -1298,6 +1298,7 @@ func parseListMessage(lm *waE2E.ListMessage) *WookInteractiveMessageRaw {
 				Type:        "list_row",
 				DisplayText: prefixo + display,
 				Id:          row.GetRowID(),
+				Description: row.GetDescription(),
 			})
 		}
 	}

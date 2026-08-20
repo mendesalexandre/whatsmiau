@@ -148,7 +148,7 @@ func TestParseWAMessageListMessageSingleSection(t *testing.T) {
 				{
 					Rows: []*waE2E.ListMessage_Row{
 						{Title: proto.String("Certidão"), RowID: proto.String("row-1")},
-						{Title: proto.String("Financeiro"), RowID: proto.String("row-2")},
+						{Title: proto.String("Titulos e Documentos"), RowID: proto.String("row-2"), Description: proto.String("(Cartas de Anuência, Contratos de Cessão, etc)")},
 					},
 				},
 			},
@@ -176,8 +176,14 @@ func TestParseWAMessageListMessageSingleSection(t *testing.T) {
 	if raw.InteractiveMessage.Buttons[0].DisplayText != "Certidão" {
 		t.Fatalf("expected first option 'Certidão' without prefix, got %q", raw.InteractiveMessage.Buttons[0].DisplayText)
 	}
+	if raw.InteractiveMessage.Buttons[0].Description != "" {
+		t.Fatalf("expected first option without description, got %q", raw.InteractiveMessage.Buttons[0].Description)
+	}
 	if raw.InteractiveMessage.Buttons[1].Id != "row-2" {
 		t.Fatalf("expected row id preserved, got %q", raw.InteractiveMessage.Buttons[1].Id)
+	}
+	if raw.InteractiveMessage.Buttons[1].Description != "(Cartas de Anuência, Contratos de Cessão, etc)" {
+		t.Fatalf("expected second option description preserved, got %q", raw.InteractiveMessage.Buttons[1].Description)
 	}
 }
 
