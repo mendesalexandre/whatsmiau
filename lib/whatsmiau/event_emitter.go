@@ -1306,6 +1306,58 @@ func parseListMessage(lm *waE2E.ListMessage) *WookInteractiveMessageRaw {
 	return out
 }
 
+// parseHydratedTemplate extrai título/corpo/rodapé/botões de um template
+// "hidratado" da Business API (TemplateMessage.HydratedFourRowTemplate) —
+// formato mais antigo, anterior ao InteractiveMessage/NativeFlowMessage,
+// ainda usado por algumas contas. Suporta os 3 tipos de botão hidratado:
+// resposta rápida, link e ligação telefônica.
+func parseHydratedTemplate(ht *waE2E.TemplateMessage_HydratedFourRowTemplate) *WookInteractiveMessageRaw {
+	out := &WookInteractiveMessageRaw{
+		Title:  ht.GetHydratedTitleText(),
+		Body:   ht.GetHydratedContentText(),
+		Footer: ht.GetHydratedFooterText(),
+	}
+
+	for _, btn := range ht.GetHydratedButtons() {
+		if qr := btn.GetQuickReplyButton(); qr != nil {
+			out.Buttons = append(out.Buttons, WookInteractiveButtonRaw{
+				Type:        "quick_reply",
+				DisplayText: qr.GetDisplayText(),
+				Id:          qr.GetID(),
+			})
+		} else if url := btn.GetUrlButton(); url != nil {
+			out.Buttons = append(out.Buttons, WookInteractiveButtonRaw{
+				Type:        "cta_url",
+				DisplayText: url.GetDisplayText(),
+				Url:         url.GetURL(),
+			})
+		} else if call := btn.GetCallButton(); call != nil {
+			out.Buttons = append(out.Buttons, WookInteractiveButtonRaw{
+				Type:        "cta_call",
+				DisplayText: call.GetDisplayText(),
+				Id:          call.GetPhoneNumber(),
+			})
+		}
+	}
+
+	return out
+}
+
+// captureRawUnknown serializa o proto inteiro via protojson.Marshal quando
+// nenhum case decodificado bateu — rede de segurança pra nunca mais perder
+// o conteúdo de um tipo de mensagem sem deixar rastro nenhum (achado real:
+// 2026-08-19, mensagem "unknown" com message=[] vazio, zero dado sobrando
+// em qualquer lugar pra reconstruir depois). Cobre qualquer tipo futuro
+// (order, product, highly-structured, etc) sem precisar prever qual vai
+// aparecer. Best-effort: falha aqui não deve derrubar o processamento.
+func captureRawUnknown(m *waE2E.Message, raw *WookMessageRaw) {
+	if rawJSON, err := protojson.Marshal(m); err == nil {
+		raw.RawUnknown = json.RawMessage(rawJSON)
+	} else {
+		zap.L().Warn("parseWAMessage: falha ao serializar mensagem de tipo desconhecido", zap.Error(err))
+	}
+}
+
 // parseWAMessage converts a raw waE2E.Message into our internal representation.
 // It only inspects the content of the protobuf message itself –
 // media upload (URL/Base64 generation) is handled later by the caller.
@@ -1590,6 +1642,36 @@ func (s *Whatsmiau) parseWAMessage(m *waE2E.Message) (string, *WookMessageRaw, *
 		messageType = "interactiveMessage"
 		ci = lm.GetContextInfo()
 		raw.InteractiveMessage = parseListMessage(lm)
+	} else if tm := m.GetTemplateMessage(); tm != nil {
+		// Formato de template mais antigo da Business API — terceiro
+		// formato diferente (além de InteractiveMessage/ButtonsMessage e
+		// ListMessage, já tratados). Pode vir de 3 jeitos: envelopando um
+		// InteractiveMessage de verdade (delega pro parser já existente),
+		// hidratado com botões próprios (HydratedFourRowTemplate), ou não
+		// hidratado (FourRowTemplate — precisa de um template cadastrado
+		// à parte pra resolver, não decodificável sozinho; cai no
+		// fallback rawUnknown).
+		if im := tm.GetInteractiveMessageTemplate(); im != nil {
+			messageType = "interactiveMessage"
+			ci = im.GetContextInfo()
+			raw.InteractiveMessage = parseInteractiveMessage(im)
+		} else if ht := tm.GetHydratedTemplate(); ht != nil {
+			messageType = "interactiveMessage"
+			ci = tm.GetContextInfo()
+			raw.InteractiveMessage = parseHydratedTemplate(ht)
+		} else if ht := tm.GetHydratedFourRowTemplate(); ht != nil {
+			messageType = "interactiveMessage"
+			ci = tm.GetContextInfo()
+			raw.InteractiveMessage = parseHydratedTemplate(ht)
+		} else {
+			// FourRowTemplate não-hidratado — precisa de um template
+			// cadastrado à parte (por ID) pra resolver o texto/botões
+			// reais, não dá pra decodificar sozinho a partir só do que
+			// chega na mensagem. Mesmo fallback seguro do "unknown".
+			messageType = "unknown"
+			ci = tm.GetContextInfo()
+			captureRawUnknown(m, raw)
+		}
 	} else if conv := strings.TrimSpace(m.GetConversation()); conv != "" {
 		messageType = "conversation"
 		raw.Conversation = conv
@@ -1599,22 +1681,7 @@ func (s *Whatsmiau) parseWAMessage(m *waE2E.Message) (string, *WookMessageRaw, *
 		ci = et.GetContextInfo()
 	} else {
 		messageType = "unknown"
-
-		// Nunca mais perder o conteúdo de um tipo de mensagem que ainda não
-		// decodificamos (achado real: 2026-08-19 — messageType
-		// unknown com message=[] vazio, sem NENHUM dado sobrando pra
-		// reconstruir o que o cliente mandou, e sem acesso ao celular dele
-		// pra conferir). protojson.Marshal serializa TODOS os campos
-		// populados do proto genérico, independente de já termos um case
-		// dedicado ou não — cobre qualquer tipo futuro (template, list,
-		// order, product, interactive-response, etc) sem precisar prever
-		// qual vai aparecer. Best-effort: falha aqui não deve derrubar o
-		// processamento do evento.
-		if rawJSON, err := protojson.Marshal(m); err == nil {
-			raw.RawUnknown = json.RawMessage(rawJSON)
-		} else {
-			zap.L().Warn("parseWAMessage: falha ao serializar mensagem de tipo desconhecido", zap.Error(err))
-		}
+		captureRawUnknown(m, raw)
 	}
 
 	// O wrapper viewOnceMessage/V2/V2Extension não carrega a flag ViewOnce

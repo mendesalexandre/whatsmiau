@@ -221,6 +221,108 @@ func TestParseWAMessageListMessageMultipleSectionsPrefixesTitle(t *testing.T) {
 	}
 }
 
+// TemplateMessage — terceiro formato de menu de conta Business API, além de
+// InteractiveMessage/ButtonsMessage e ListMessage (2026-08-20).
+func TestParseWAMessageTemplateMessageHydratedButtons(t *testing.T) {
+	s := &Whatsmiau{}
+	m := &waE2E.Message{
+		TemplateMessage: &waE2E.TemplateMessage{
+			HydratedTemplate: &waE2E.TemplateMessage_HydratedFourRowTemplate{
+				Title:               &waE2E.TemplateMessage_HydratedFourRowTemplate_HydratedTitleText{HydratedTitleText: "Confirmação de agendamento"},
+				HydratedContentText: proto.String("Seu horário está marcado"),
+				HydratedFooterText:  proto.String("Cartório XYZ"),
+				HydratedButtons: []*waE2E.HydratedTemplateButton{
+					{HydratedButton: &waE2E.HydratedTemplateButton_QuickReplyButton{
+						QuickReplyButton: &waE2E.HydratedTemplateButton_HydratedQuickReplyButton{
+							DisplayText: proto.String("Confirmar"), ID: proto.String("btn-1"),
+						},
+					}},
+					{HydratedButton: &waE2E.HydratedTemplateButton_UrlButton{
+						UrlButton: &waE2E.HydratedTemplateButton_HydratedURLButton{
+							DisplayText: proto.String("Ver no mapa"), URL: proto.String("https://maps.example.com"),
+						},
+					}},
+					{HydratedButton: &waE2E.HydratedTemplateButton_CallButton{
+						CallButton: &waE2E.HydratedTemplateButton_HydratedCallButton{
+							DisplayText: proto.String("Ligar"), PhoneNumber: proto.String("+5511999998888"),
+						},
+					}},
+				},
+			},
+		},
+	}
+
+	messageType, raw, _ := s.parseWAMessage(m)
+
+	if messageType != "interactiveMessage" {
+		t.Fatalf("expected interactiveMessage, got %q", messageType)
+	}
+	if raw.InteractiveMessage.Title != "Confirmação de agendamento" {
+		t.Fatalf("expected title preserved, got %q", raw.InteractiveMessage.Title)
+	}
+	if raw.InteractiveMessage.Body != "Seu horário está marcado" {
+		t.Fatalf("expected body preserved, got %q", raw.InteractiveMessage.Body)
+	}
+	if len(raw.InteractiveMessage.Buttons) != 3 {
+		t.Fatalf("expected 3 buttons, got %d", len(raw.InteractiveMessage.Buttons))
+	}
+	if raw.InteractiveMessage.Buttons[0].Type != "quick_reply" || raw.InteractiveMessage.Buttons[0].Id != "btn-1" {
+		t.Fatalf("expected quick_reply button with id preserved, got %+v", raw.InteractiveMessage.Buttons[0])
+	}
+	if raw.InteractiveMessage.Buttons[1].Type != "cta_url" || raw.InteractiveMessage.Buttons[1].Url != "https://maps.example.com" {
+		t.Fatalf("expected cta_url button with url preserved, got %+v", raw.InteractiveMessage.Buttons[1])
+	}
+	if raw.InteractiveMessage.Buttons[2].Type != "cta_call" || raw.InteractiveMessage.Buttons[2].Id != "+5511999998888" {
+		t.Fatalf("expected cta_call button with phone preserved, got %+v", raw.InteractiveMessage.Buttons[2])
+	}
+}
+
+func TestParseWAMessageTemplateMessageDelegatesToInteractiveMessage(t *testing.T) {
+	s := &Whatsmiau{}
+	m := &waE2E.Message{
+		TemplateMessage: &waE2E.TemplateMessage{
+			Format: &waE2E.TemplateMessage_InteractiveMessageTemplate{
+				InteractiveMessageTemplate: &waE2E.InteractiveMessage{
+					Body: &waE2E.InteractiveMessage_Body{Text: proto.String("Escolha uma opção")},
+				},
+			},
+		},
+	}
+
+	messageType, raw, _ := s.parseWAMessage(m)
+
+	if messageType != "interactiveMessage" {
+		t.Fatalf("expected interactiveMessage, got %q", messageType)
+	}
+	if raw.InteractiveMessage.Body != "Escolha uma opção" {
+		t.Fatalf("expected body from delegated InteractiveMessage, got %q", raw.InteractiveMessage.Body)
+	}
+}
+
+func TestParseWAMessageTemplateMessageNonHydratedFallsBackToUnknown(t *testing.T) {
+	s := &Whatsmiau{}
+	m := &waE2E.Message{
+		TemplateMessage: &waE2E.TemplateMessage{
+			TemplateID: proto.String("template-123"),
+			Format: &waE2E.TemplateMessage_FourRowTemplate_{
+				FourRowTemplate: &waE2E.TemplateMessage_FourRowTemplate{},
+			},
+		},
+	}
+
+	messageType, raw, _ := s.parseWAMessage(m)
+
+	if messageType != "unknown" {
+		t.Fatalf("expected unknown (non-hydrated template needs external lookup), got %q", messageType)
+	}
+	if len(raw.RawUnknown) == 0 {
+		t.Fatalf("expected RawUnknown populated as safety net")
+	}
+	if !strings.Contains(string(raw.RawUnknown), "template-123") {
+		t.Fatalf("expected RawUnknown to contain templateID, got %q", string(raw.RawUnknown))
+	}
+}
+
 func TestParseWAMessageKnownTypeLeavesRawUnknownEmpty(t *testing.T) {
 	s := &Whatsmiau{}
 	m := &waE2E.Message{
