@@ -1398,6 +1398,20 @@ func (s *Whatsmiau) parseWAMessage(m *waE2E.Message) (string, *WookMessageRaw, *
 			SenderTimestampMs: i64(r.GetSenderTimestampMS()),
 			Key:               reactionKey,
 		}
+	} else if pin := m.GetPinInChatMessage(); pin != nil {
+		messageType = "pinInChatMessage"
+		pinKey := &WookKey{}
+		if pk := pin.GetKey(); pk != nil {
+			pinKey.RemoteJid = pk.GetRemoteJID()
+			pinKey.FromMe = pk.GetFromMe()
+			pinKey.Id = pk.GetID()
+			pinKey.Participant = pk.GetParticipant()
+		}
+		raw.PinInChatMessage = &WookPinInChatMessageRaw{
+			Key:               pinKey,
+			Type:              pin.GetType().String(),
+			SenderTimestampMs: i64(pin.GetSenderTimestampMS()),
+		}
 	} else if lr := m.GetListResponseMessage(); lr != nil {
 		messageType = "listResponseMessage"
 		listType := lr.GetListType().String()

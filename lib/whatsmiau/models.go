@@ -112,6 +112,7 @@ type WookMessageRaw struct {
 	VideoMessage         *WookVideoMessageRaw     `json:"videoMessage,omitempty"`
 	AudioMessage         *WookAudioMessageRaw     `json:"audioMessage,omitempty"`
 	ReactionMessage      *ReactionMessageRaw      `json:"reactionMessage,omitempty"`
+	PinInChatMessage     *WookPinInChatMessageRaw `json:"pinInChatMessage,omitempty"`
 	ContactMessage       *ContactMessageRaw       `json:"contactMessage,omitempty"`
 	ContactsArrayMessage *ContactsArrayMessageRaw `json:"contactsArrayMessage,omitempty"`
 	//MessageContextInfo  WookMessageContextInfo `json:"messageContextInfo,omitempty"`
@@ -227,6 +228,17 @@ type WookListRow struct {
 type ReactionMessageRaw struct {
 	Key               *WookKey `json:"key,omitempty"`
 	Text              string   `json:"text,omitempty"`
+	SenderTimestampMs string   `json:"senderTimestampMs,omitempty"`
+}
+
+// WookPinInChatMessageRaw: cliente fixou (ou desafixou) uma mensagem no
+// chat — ação de UI, não conteúdo próprio. Key aponta pra mensagem alvo.
+// Type: "PIN_FOR_ALL" | "UNPIN_FOR_ALL". Achado real: primeiro contato
+// visto pinando uma mensagem nossa (2026-08-24) caía em "unknown" com
+// placeholder genérico pro atendente.
+type WookPinInChatMessageRaw struct {
+	Key               *WookKey `json:"key,omitempty"`
+	Type              string   `json:"type,omitempty"`
 	SenderTimestampMs string   `json:"senderTimestampMs,omitempty"`
 }
 

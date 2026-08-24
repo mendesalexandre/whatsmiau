@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"google.golang.org/protobuf/proto"
 )
@@ -333,5 +334,38 @@ func TestParseWAMessageKnownTypeLeavesRawUnknownEmpty(t *testing.T) {
 
 	if len(raw.RawUnknown) != 0 {
 		t.Fatalf("expected RawUnknown empty for a known/handled type, got %q", string(raw.RawUnknown))
+	}
+}
+
+func TestParseWAMessagePinInChatMessage(t *testing.T) {
+	s := &Whatsmiau{}
+	m := &waE2E.Message{
+		PinInChatMessage: &waE2E.PinInChatMessage{
+			Type:              waE2E.PinInChatMessage_PIN_FOR_ALL.Enum(),
+			SenderTimestampMS: proto.Int64(1787597976949),
+			Key: &waCommon.MessageKey{
+				ID:        proto.String("3EB0CD61BAEB5A41055352"),
+				FromMe:    proto.Bool(false),
+				RemoteJID: proto.String("556581316973@s.whatsapp.net"),
+			},
+		},
+	}
+
+	messageType, raw, _ := s.parseWAMessage(m)
+
+	if messageType != "pinInChatMessage" {
+		t.Fatalf("expected pinInChatMessage, got %q", messageType)
+	}
+	if raw.PinInChatMessage == nil {
+		t.Fatalf("expected PinInChatMessage populated, got nil")
+	}
+	if raw.PinInChatMessage.Type != "PIN_FOR_ALL" {
+		t.Fatalf("expected type PIN_FOR_ALL, got %q", raw.PinInChatMessage.Type)
+	}
+	if raw.PinInChatMessage.Key == nil || raw.PinInChatMessage.Key.Id != "3EB0CD61BAEB5A41055352" {
+		t.Fatalf("expected key.id 3EB0CD61BAEB5A41055352, got %+v", raw.PinInChatMessage.Key)
+	}
+	if len(raw.RawUnknown) != 0 {
+		t.Fatalf("expected RawUnknown empty (tipo agora conhecido), got %q", string(raw.RawUnknown))
 	}
 }
