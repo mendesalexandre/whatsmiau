@@ -79,6 +79,88 @@ func (s *Whatsmiau) SendText(ctx context.Context, data *SendText) (*SendTextResp
 	}, nil
 }
 
+// SendListReply responde uma mensagem de LISTA (ListMessage) do jeito que
+// o WhatsApp de verdade espera — um ListResponseMessage estruturado
+// carregando o rowId interno da opção escolhida, não um texto solto.
+// (Nome "Reply", não "Response", pra não colidir com SendListResponse —
+// que já existe como o TIPO DE RETORNO de SendList, outbound.)
+//
+// Achado real (CartZap, 2026-08-27): quando o atendente "clica" numa opção
+// de um menu recebido de outra conta WhatsApp Business API (ex: outro
+// cartório), mandar de volta um texto simples citando a mensagem original
+// NÃO é reconhecido pelo bot do lado de lá como uma seleção válida — ele
+// espera exatamente esse formato estruturado, igual o app oficial do
+// WhatsApp gera quando o usuário toca numa linha da lista.
+type SendListReply struct {
+	InstanceID     string     `json:"instance_id"`
+	RemoteJID      *types.JID `json:"remote_jid"`
+	Title          string     `json:"title"`
+	SelectedRowID  string     `json:"selected_row_id"`
+	QuoteMessageID string     `json:"quote_message_id"`
+	QuoteMessage   string     `json:"quote_message"`
+	QuoteRemoteJid string     `json:"quote_remote_jid"`
+}
+
+type SendListReplyResponse struct {
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (s *Whatsmiau) SendListReply(ctx context.Context, data *SendListReply) (*SendListReplyResponse, error) {
+	client, ok := s.clients.Load(data.InstanceID)
+	if !ok {
+		return nil, whatsmeow.ErrClientIsNil
+	}
+
+	if data.RemoteJID == nil {
+		return nil, fmt.Errorf("remote_jid is required")
+	}
+	if data.SelectedRowID == "" {
+		return nil, fmt.Errorf("selected_row_id is required")
+	}
+
+	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
+	data.RemoteJID = &resolved
+
+	listType := waE2E.ListResponseMessage_SINGLE_SELECT
+
+	var contextInfo *waE2E.ContextInfo
+	if len(data.QuoteMessageID) > 0 {
+		remoteJidStr := data.QuoteRemoteJid
+		if remoteJidStr == "" {
+			remoteJidStr = data.RemoteJID.ToNonAD().String()
+		}
+		contextInfo = &waE2E.ContextInfo{
+			StanzaID:    &data.QuoteMessageID,
+			Participant: &remoteJidStr,
+		}
+		if len(data.QuoteMessage) > 0 {
+			contextInfo.QuotedMessage = &waE2E.Message{Conversation: &data.QuoteMessage}
+		}
+	}
+
+	msg := &waE2E.Message{
+		ListResponseMessage: &waE2E.ListResponseMessage{
+			Title:    &data.Title,
+			ListType: &listType,
+			SingleSelectReply: &waE2E.ListResponseMessage_SingleSelectReply{
+				SelectedRowID: &data.SelectedRowID,
+			},
+			ContextInfo: contextInfo,
+		},
+	}
+
+	res, err := client.SendMessage(ctx, *data.RemoteJID, msg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SendListReplyResponse{
+		ID:        res.ID,
+		CreatedAt: res.Timestamp,
+	}, nil
+}
+
 type SendLocationRequest struct {
 	InstanceID string     `json:"instance_id"`
 	RemoteJID  *types.JID `json:"remote_jid"`

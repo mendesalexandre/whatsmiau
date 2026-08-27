@@ -11,6 +11,26 @@ type SendTextRequest struct {
 	Mentioned        []string              `json:"mentioned,omitempty"`
 }
 
+// SendListReplyRequest — resposta estruturada de lista (ListMessage), o
+// formato que o WhatsApp de verdade espera quando alguém "toca" numa opção
+// de menu, em vez de um texto solto. Ver comentário completo em
+// lib/whatsmiau/send.go::SendListReply.
+type SendListReplyRequest struct {
+	InstanceID    string                `param:"instance" validate:"required" swaggerignore:"true"`
+	Number        string                `json:"number,omitempty" validate:"required"`
+	Title         string                `json:"title,omitempty" validate:"required"`
+	SelectedRowId string                `json:"selectedRowId,omitempty" validate:"required"`
+	Quoted        *MessageRequestQuoted `json:"quoted,omitempty"`
+}
+
+type SendListReplyResponseDto struct {
+	Key              MessageResponseKey `json:"key"`
+	Status           string             `json:"status"`
+	MessageType      string             `json:"messageType"`
+	MessageTimestamp int64              `json:"messageTimestamp"`
+	InstanceId       string             `json:"instanceId"`
+}
+
 type SendLocationRequest struct {
 	InstanceID string  `param:"instance" validate:"required" swaggerignore:"true"`
 	Number     string  `json:"number,omitempty" validate:"required"`

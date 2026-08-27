@@ -13,6 +13,7 @@ func Message(group *echo.Group) {
 	controller := controllers.NewMessages(redisInstance, whatsmiau.Get())
 
 	group.POST("/text", controller.SendText)
+	group.POST("/list-response", controller.SendListReply)
 	group.POST("/audio", controller.SendAudio)
 	group.POST("/document", controller.SendDocument)
 	group.POST("/image", controller.SendImage)

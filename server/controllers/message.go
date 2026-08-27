@@ -108,6 +108,69 @@ func (s *Message) SendText(ctx echo.Context) error {
 	})
 }
 
+// SendListReply godoc
+// @Summary      Reply to a list message with the WhatsApp-native list response
+// @Description  Sends a structured ListResponseMessage (selectedRowId) instead of plain text — required for the receiving Business API bot to recognize the selection
+// @Tags         Message
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string                    true  "Instance ID"
+// @Param        body      body      dto.SendListReplyRequest  true  "List response parameters"
+// @Success      200       {object}  dto.SendListReplyResponseDto
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      422       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /instance/{instance}/message/list-response [post]
+func (s *Message) SendListReply(ctx echo.Context) error {
+	var request dto.SendListReplyRequest
+	if err := ctx.Bind(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+	}
+
+	if err := validator.New().Struct(&request); err != nil {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+	}
+
+	jid, err := numberToJid(request.Number)
+	if err != nil {
+		zap.L().Error("error converting number to jid", zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid number format")
+	}
+
+	sendListReply := &whatsmiau.SendListReply{
+		Title:         request.Title,
+		SelectedRowID: request.SelectedRowId,
+		InstanceID:    request.InstanceID,
+		RemoteJID:     jid,
+	}
+
+	if request.Quoted != nil && len(request.Quoted.Key.Id) > 0 {
+		sendListReply.QuoteMessage = request.Quoted.Message.Conversation
+		sendListReply.QuoteMessageID = request.Quoted.Key.Id
+		sendListReply.QuoteRemoteJid = request.Quoted.Key.RemoteJid
+	}
+
+	c := ctx.Request().Context()
+	res, err := s.whatsmiau.SendListReply(c, sendListReply)
+	if err != nil {
+		zap.L().Error("Whatsmiau.SendListReply failed", zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to send list response")
+	}
+
+	return ctx.JSON(http.StatusOK, dto.SendListReplyResponseDto{
+		Key: dto.MessageResponseKey{
+			RemoteJid: request.Number,
+			FromMe:    true,
+			Id:        res.ID,
+		},
+		Status:           "sent",
+		MessageType:      "listResponseMessage",
+		MessageTimestamp: res.CreatedAt.UnixMilli(),
+		InstanceId:       request.InstanceID,
+	})
+}
+
 // SendLocation godoc
 // @Summary      Send a location pin
 // @Description  Sends a location pin (latitude/longitude with optional name and address) to a WhatsApp number
