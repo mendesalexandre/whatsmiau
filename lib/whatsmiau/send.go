@@ -124,21 +124,15 @@ func (s *Whatsmiau) SendListReply(ctx context.Context, data *SendListReply) (*Se
 
 	listType := waE2E.ListResponseMessage_SINGLE_SELECT
 
-	var contextInfo *waE2E.ContextInfo
-	if len(data.QuoteMessageID) > 0 {
-		remoteJidStr := data.QuoteRemoteJid
-		if remoteJidStr == "" {
-			remoteJidStr = data.RemoteJID.ToNonAD().String()
-		}
-		contextInfo = &waE2E.ContextInfo{
-			StanzaID:    &data.QuoteMessageID,
-			Participant: &remoteJidStr,
-		}
-		if len(data.QuoteMessage) > 0 {
-			contextInfo.QuotedMessage = &waE2E.Message{Conversation: &data.QuoteMessage}
-		}
-	}
-
+	// SEM ContextInfo/quoted — um toque de verdade numa opção de lista no
+	// app oficial NÃO cita/responde a mensagem do menu (a relação já é
+	// implícita no próprio ListResponseMessage). Testado ao vivo (LRV,
+	// 2026-08-31): toda tentativa COM ContextInfo aqui voltava do servidor
+	// do WhatsApp com "server returned error 479" (Invalid stanza sent,
+	// smax-invalid) — o SendText normal usa o mesmo padrão de ContextInfo
+	// sem problema, então o campo em si não é ilegal; a suspeita é que o
+	// servidor valida ListResponseMessage contra o formato exato que o app
+	// oficial gera, e citar a msg original não faz parte disso.
 	msg := &waE2E.Message{
 		ListResponseMessage: &waE2E.ListResponseMessage{
 			Title:    &data.Title,
@@ -146,7 +140,6 @@ func (s *Whatsmiau) SendListReply(ctx context.Context, data *SendListReply) (*Se
 			SingleSelectReply: &waE2E.ListResponseMessage_SingleSelectReply{
 				SelectedRowID: &data.SelectedRowID,
 			},
-			ContextInfo: contextInfo,
 		},
 	}
 
