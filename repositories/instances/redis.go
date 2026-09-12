@@ -94,6 +94,13 @@ func (s *RedisInstance) Update(ctx context.Context, id string, toUpdate *models.
 		oldInstance.Webhook.Events = toUpdate.Webhook.Events
 	}
 
+	if toUpdate.RejectCall != nil {
+		oldInstance.RejectCall = toUpdate.RejectCall
+	}
+	if toUpdate.MsgCall != "" {
+		oldInstance.MsgCall = toUpdate.MsgCall
+	}
+
 	if toUpdate.ProxyHost != "" {
 		oldInstance.InstanceProxy = toUpdate.InstanceProxy
 	}

@@ -48,6 +48,8 @@ type UpdateInstanceRequest struct {
 		URL     string   `json:"url,omitempty"`
 		Events  []string `json:"events,omitempty"`
 	} `json:"webhook,omitempty"`
+	RejectCall *bool  `json:"rejectCall,omitempty"`
+	MsgCall    string `json:"msgCall,omitempty"`
 	models.InstanceProxy
 }
 

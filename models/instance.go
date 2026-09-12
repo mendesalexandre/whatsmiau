@@ -2,7 +2,7 @@ package models
 
 type Instance struct {
 	ID                string          `json:"id,omitempty"`
-	RejectCall        bool            `json:"rejectCall,omitempty"`
+	RejectCall        *bool           `json:"rejectCall,omitempty"`
 	MsgCall           string          `json:"msgCall,omitempty"`
 	GroupsIgnore      bool            `json:"groupsIgnore,omitempty"`
 	AlwaysOnline      bool            `json:"alwaysOnline,omitempty"`

@@ -552,7 +552,7 @@ func (s *Whatsmiau) handleCallOfferEvent(id string, instance *models.Instance, e
 	zap.L().Info("call offer event", zap.String("instance", id), zap.Any("data", callData))
 	s.emit(wookEvent, instance.Webhook.Url, instance.Webhook.Headers, instance.ID, string(wookEvent.Event))
 
-	if !instance.RejectCall {
+	if instance.RejectCall == nil || !*instance.RejectCall {
 		return
 	}
 

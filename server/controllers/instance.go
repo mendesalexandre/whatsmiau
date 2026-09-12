@@ -142,6 +142,8 @@ func (s *Instance) Update(ctx echo.Context) error {
 			Base64:  &[]bool{request.Webhook.Base64}[0],
 			Events:  request.Webhook.Events,
 		},
+		RejectCall:    request.RejectCall,
+		MsgCall:       request.MsgCall,
 		InstanceProxy: request.InstanceProxy,
 	})
 	if err != nil {
